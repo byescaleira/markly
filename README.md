@@ -33,7 +33,7 @@ Add Markly as a package dependency:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/byescaleira/markly.git", from: "0.3.0")
+    .package(url: "https://github.com/byescaleira/markly.git", from: "0.3.1")
 ]
 ```
 

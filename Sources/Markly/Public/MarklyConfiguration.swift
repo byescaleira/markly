@@ -24,7 +24,9 @@ public struct MarklyFeatures: Sendable, Equatable {
     public var search: Bool
     /// Bookmarks (Phase 2).
     public var bookmarks: Bool
-    /// Share action (Phase 2; v0.3 wires the UI).
+    /// Share action (Phase 2; v0.3 wires the UI). Unsupported on tvOS, where `ShareLink` / a
+    /// system share sheet do not exist; the toggle is normalized to `false` there on construction
+    /// so it reflects reality rather than being silently ignored.
     public var share: Bool
     /// Multi-color highlights over selectable text (v0.3). No creation on tvOS (no text
     /// selection); existing highlights remain view-only there.
@@ -55,7 +57,12 @@ public struct MarklyFeatures: Sendable, Equatable {
         self.tableOfContents = tableOfContents
         self.search = search
         self.bookmarks = bookmarks
+        #if os(tvOS)
+        // `ShareLink` and a system share sheet do not exist on tvOS; never advertise share there.
+        self.share = false
+        #else
         self.share = share
+        #endif
         self.highlights = highlights
         self.chapters = chapters
         self.settingsPanel = settingsPanel

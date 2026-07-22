@@ -22,6 +22,13 @@ struct MarklyReaderView: View {
     let readingMode: MarklyReadingMode
 
     @Environment(\.cosmosTheme) private var theme
+    /// The reader's font-size step. Applied to the SwiftUI `Text`-based blocks (headings, non-
+    /// selectable paragraphs, list markers, code, tables) via `.dynamicTypeSize` so the aA font-size
+    /// slider scales them — independent of the system Dynamic Type setting, mirroring Apple Books.
+    /// The selectable `UITextView`/`NSTextView` paragraphs scale separately via `fontSize.scale`
+    /// (UIKit/AppKit text views don't read the `.dynamicTypeSize` environment), so this does not
+    /// double-scale them.
+    @Environment(\.marklyReaderFontSize) private var fontSize
 
     /// Page padding, scaled with Dynamic Type so accessibility text sizes keep generous margins
     /// rather than a fixed 32pt (Apple accessibility guidance for reading content).
@@ -59,5 +66,9 @@ struct MarklyReaderView: View {
         }
         .scrollTargetLayout()
         .padding(pagePadding)
+        // Drive every SwiftUI `Text`-based block from the reader's font-size step (independent of
+        // the system Dynamic Type setting, like Apple Books). The selectable text views are
+        // unaffected (they size via `fontSize.scale`, not this environment).
+        .dynamicTypeSize(fontSize.dynamicTypeSize)
     }
 }

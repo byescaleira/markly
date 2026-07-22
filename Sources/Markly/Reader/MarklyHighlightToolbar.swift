@@ -46,7 +46,8 @@ struct MarklyHighlightToolbar: View {
         }
         .padding(.horizontal, CosmosSpacingTokens.medium)
         .padding(.vertical, CosmosSpacingTokens.small)
-        .background(theme.colors.surface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        // Large floating surface → iOS 26 uses a generous corner radius (matching first-party cards).
+        .background(theme.colors.surface, in: RoundedRectangle(cornerRadius: 32, style: .continuous))
         .shadow(color: .black.opacity(0.25), radius: 8, y: 2)
         .task(id: existing?.id) {
             // Seed the note editor with the existing highlight's note whenever the highlight changes.
@@ -174,19 +175,5 @@ struct MarklyHighlightToolbar: View {
                 .accessibilityLabel(Text("Remove Highlight", bundle: .module))
         }
         .buttonStyle(.plain)
-    }
-}
-
-extension MarklyHighlightColor {
-    /// A localized accessibility name for this color.
-    fileprivate var accessibilityName: LocalizedStringKey {
-        switch self {
-        case .underline: "Underline"
-        case .yellow: "Yellow"
-        case .green: "Green"
-        case .blue: "Blue"
-        case .pink: "Pink"
-        case .purple: "Purple"
-        }
     }
 }

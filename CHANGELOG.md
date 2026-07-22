@@ -6,6 +6,27 @@ All notable changes to Markly are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-07-22
+
+Follow-up to v0.3.0: test-framework migration, iOS 26 corner-radius polish, and the four
+review-regression tests deferred from v0.3.0. 85 passing tests; builds clean on iOS, macOS,
+tvOS, and visionOS 26.
+
+### Changed
+
+- **Migrated the entire test suite from XCTest to Swift Testing** (`import Testing`, `@Test`,
+  `#expect` / `#require`, `@Suite struct`, `Issue.record`). XCTest is no longer used anywhere.
+- **iOS 26 Liquid Glass corner radii**, applied per Apple's concentricity guidance rather than a
+  single universal value: the large floating highlight toolbar uses 32pt, code blocks 20pt, and
+  the small color-swatch chip stays 4pt; circles and capsules are untouched.
+
+### Added
+
+- Review-regression tests: chapter previous/next navigation (stops at edges, out-of-range no-op),
+  settings-decode priority (`paperStyle` over legacy `theme`) and per-field fallback to defaults,
+  controller theme resolution from the system color scheme + persistence, and inlineCode
+  whitespace round-trip through the serializer (locks the selectable-text highlight coordinate basis).
+
 ## [0.3.0] - 2026-07-22
 
 Initial public release. Apple-Books-style e-reader built on the sibling Nebula and Cosmos

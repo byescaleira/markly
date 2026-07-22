@@ -110,7 +110,7 @@ Remaining limitations:
 
 ## 10. v0.3 — Apple Books-style chrome, highlights, chapters, settings, share
 
-v0.3 turns the reader into an Apple-Books-style e-reader: top + bottom toolbars with menus, free-form multi-color highlights, chapters derived from `#` headings, an appearance (aA) sheet, and share. All four platforms (iOS/macOS/tvOS/visionOS) build and the test suite is **76 passing** (57 + 19 v0.3 domain tests in `MarklyV03DomainTests`, incl. regressions for the note-on-fresh-selection flow).
+v0.3 turns the reader into an Apple-Books-style e-reader: top + bottom toolbars with menus, free-form multi-color highlights, chapters derived from `#` headings, an appearance (aA) sheet, and share. All four platforms (iOS/macOS/tvOS/visionOS) build and the test suite is **85 passing** (61 + 24 v0.3 domain tests in `MarklyV03DomainTests`, incl. regressions for the note-on-fresh-selection flow). The suite uses Apple's Swift Testing (`import Testing`, `@Test`, `#expect`/`#require`, `@Suite struct`) — XCTest was removed in v0.3.1.
 
 ### 10.1 Highlights via a selectable text view
 
@@ -230,15 +230,17 @@ Sources/Markly/
   Resources/
     Localizable.xcstrings               reader chrome string catalog
 Sources/MarklyTests/
-  MarklyDocumentParserTests.swift       12 parser tests
+  MarklyDocumentParserTests.swift       16 parser tests (incl. inlineCode whitespace round-trip)
   MarklyReadingTests.swift              10 reading/settings tests
   MarklySearchTests.swift               17 search tests
   MarklyErrorMappingTests.swift         11 error-bridge tests
   MarklyInstrumentationTests.swift      7 use-case/report tests
-  MarklyV03DomainTests.swift            19 v0.3 domain tests (highlights/chapters/paper/font + note-flow regressions) (v0.3)
+  MarklyV03DomainTests.swift            24 v0.3 domain tests (highlights/chapters/paper/font + note-flow regressions + chapter navigation, settings-decode priority/fallback, theme resolution) (v0.3)
   Fixtures/sample.md                    all-blocks fixture
 ```
 
-**Total: 76 passing tests** (57 v0.1/v0.2 + 19 v0.3).
+**Total: 85 passing tests** (61 v0.1/v0.2 + 24 v0.3), all on Apple's Swift Testing (`import Testing`, `@Test`, `#expect`/`#require`, `@Suite struct`) — XCTest was removed in v0.3.1.
+
+**v0.3.1 follow-up**: migrated the entire suite from XCTest to Swift Testing; applied iOS 26 Liquid Glass corner radii per Apple's concentricity guidance (the large floating highlight toolbar uses 32pt, code blocks 20pt, the small color swatch chip stays 4pt; circles/capsules are untouched); and added the four review-regression tests deferred from v0.3 (chapter navigation, settings-decode priority/fallback, controller theme resolution, inlineCode whitespace round-trip).
 
 v0.3 passed an adversarial code review (multi-dimension, refutation-verified). Four findings were confirmed and fixed: the TOC current-section row now carries an `.isSelected` accessibility trait + value (the accent-color cue was color-only); the font-size and brightness sliders gained `.accessibilityLabel` (the heading `Text` was a sibling, not the slider's label); the Note flow now works on a fresh selection (it was disabled until a color was applied, then could save nothing — it now creates a highlight with the sticky color and attaches the note, locked in by `testCreateThenSetNoteProducesSingleHighlightWithNote`); and an empty note on a fresh selection is a no-op (`testSetNoteNilClearsExistingNote`). One deferred finding: the highlight action bar floats at the viewport bottom rather than anchored above the selection rect as Apple Books does — anchoring requires plumbing the text view's selection geometry across platforms and is tracked as backlog.

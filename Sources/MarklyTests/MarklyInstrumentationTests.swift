@@ -10,41 +10,41 @@
 //  fan-out path is exercised directly in `testSecondaryLogPathFansOutToHandler`.
 //
 
-import XCTest
+import Testing
 @testable import Markly
 import Nebula
 
-final class MarklyInstrumentationTests: XCTestCase {
+@Suite struct MarklyInstrumentationTests {
 
     /// A Sendable reference box for recording handler invocations from `@Sendable` closures.
     private final class Box<T>: @unchecked Sendable { var value: T? }
 
     // MARK: - Instrumented parse use case
 
-    func testParseUseCaseReturnsBlocksAndTOC() async throws {
+    @Test func parseUseCaseReturnsBlocksAndTOC() async throws {
         let output = try await MarklyParse.useCase.executeTyped(
             MarklyParseInput(source: "# Hi\n\nA paragraph.")
         )
-        XCTAssertEqual(output.blocks.count, 2)
-        XCTAssertEqual(output.tocEntries.first?.title, "Hi")
+        #expect(output.blocks.count == 2)
+        #expect(output.tocEntries.first?.title == "Hi")
     }
 
-    func testParseUseCaseExecuteTypedNarrowsToNebulaErrorOnSuccess() async throws {
+    @Test func parseUseCaseExecuteTypedNarrowsToNebulaErrorOnSuccess() async throws {
         // The body is total today, so executeTyped succeeds (no NebulaError thrown).
         let output = try await MarklyParse.useCase.execute(MarklyParseInput(source: "# OK"))
-        XCTAssertEqual(output.blocks.first?.id.raw, "h1-ok")
+        #expect(output.blocks.first?.id.raw == "h1-ok")
     }
 
-    func testInstrumentedCompositionDoesNotBreakParsingForLargerInput() async throws {
+    @Test func instrumentedCompositionDoesNotBreakParsingForLargerInput() async throws {
         let source = (0..<50).map { "# Heading \($0)\n\nBody \($0)." }.joined(separator: "\n\n")
         let output = try await MarklyParse.useCase.executeTyped(MarklyParseInput(source: source))
-        XCTAssertEqual(output.blocks.count, 100, "50 headings + 50 paragraphs")
-        XCTAssertEqual(output.tocEntries.count, 50)
+        #expect(output.blocks.count == 100, "50 headings + 50 paragraphs")
+        #expect(output.tocEntries.count == 50)
     }
 
     // MARK: - Reported decorator
 
-    func testReportedDecoratorReportsAndRethrowsOriginalError() async {
+    @Test func reportedDecoratorReportsAndRethrowsOriginalError() async {
         let box = Box<NebulaError>()
         let errorConfig = NebulaErrorConfiguration.default
             .withHandler { event in box.value = event.error }
@@ -58,17 +58,17 @@ final class MarklyInstrumentationTests: XCTestCase {
 
         do {
             _ = try await useCase.execute(MarklyParseInput(source: ""))
-            XCTFail("Expected a throw")
+            Issue.record("Expected a throw")
         } catch {
             // Reported via the handler, then re-thrown as the original MarklyParseError.
-            XCTAssertNotNil(box.value)
-            XCTAssertEqual(box.value?.kind, .decoding)
-            XCTAssertEqual(box.value?.metadata["MarklyCode"], "forced")
-            XCTAssertTrue(error is MarklyParseError, "reported() re-throws the original error")
+            #expect(box.value != nil)
+            #expect(box.value?.kind == .decoding)
+            #expect(box.value?.metadata["MarklyCode"] == "forced")
+            #expect(error is MarklyParseError, "reported() re-throws the original error")
         }
     }
 
-    func testReportedDecoratorDoesNotReportOnSuccess() async throws {
+    @Test func reportedDecoratorDoesNotReportOnSuccess() async throws {
         let box = Box<NebulaError>()
         let errorConfig = NebulaErrorConfiguration.default
             .withHandler { event in box.value = event.error }
@@ -81,12 +81,12 @@ final class MarklyInstrumentationTests: XCTestCase {
         .reported(using: errorConfig)
 
         _ = try await useCase.execute(MarklyParseInput(source: "# Hi"))
-        XCTAssertNil(box.value, "no report should fire on success")
+        #expect(box.value == nil, "no report should fire on success")
     }
 
     // MARK: - Secondary log path fan-out (the path load() uses for explicit logging)
 
-    func testSecondaryLogPathFansOutToHandler() {
+    @Test func secondaryLogPathFansOutToHandler() {
         let sink = NebulaMemoryLogHandler()
         let config = NebulaLogConfiguration.default
             .withSubsystem("com.markly.tests")
@@ -94,11 +94,11 @@ final class MarklyInstrumentationTests: XCTestCase {
         // The secondary `log(_:_:)` path emits to os.Logger AND invokes the handler.
         config.log(.error, "Markly load failed: source-unavailable")
         let events = sink.snapshot()
-        XCTAssertTrue(events.contains { $0.message.contains("source-unavailable") })
-        XCTAssertEqual(events.last?.level, .error)
+        #expect(events.contains { $0.message.contains("source-unavailable") })
+        #expect(events.last?.level == .error)
     }
 
-    func testMarklyConfigureInstallsMarklyCategoryAndSubsystem() {
+    @Test func marklyConfigureInstallsMarklyCategoryAndSubsystem() {
         // Capture installed configs; restore a neutral default afterward so this test does not
         // leak process-wide state into other tests.
         let priorLog = NebulaLogConfig.get()
@@ -111,10 +111,10 @@ final class MarklyInstrumentationTests: XCTestCase {
         Markly.configure(subsystem: "com.markly.tests.configure")
 
         let log = NebulaLogConfig.get()
-        XCTAssertEqual(log.subsystem, "com.markly.tests.configure")
-        XCTAssertEqual(log.category.rawValue, "Markly")
+        #expect(log.subsystem == "com.markly.tests.configure")
+        #expect(log.category.rawValue == "Markly")
 
         let error = NebulaErrorConfig.get()
-        XCTAssertEqual(error.category, "Markly")
+        #expect(error.category == "Markly")
     }
 }

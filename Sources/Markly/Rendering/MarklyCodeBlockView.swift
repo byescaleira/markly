@@ -61,7 +61,9 @@ struct MarklyCodeBlockView: View {
         .padding(CosmosSpacingTokens.medium)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(theme.colors.surface)
-        .clipShape(RoundedRectangle(cornerRadius: 8))
+        // A content surface nested in the page → iOS 26 uses a moderate corner radius (smaller
+        // than the large floating toolbar, larger than a chip).
+        .clipShape(RoundedRectangle(cornerRadius: 20))
     }
 
     /// `UIPasteboard` is unavailable on tvOS, so the Copy button is hidden there (no
