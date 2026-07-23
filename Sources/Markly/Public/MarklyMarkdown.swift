@@ -38,7 +38,7 @@ public struct MarklyMarkdown: View {
     private let fontSize: MarklyFontSize
 
     @Environment(\.cosmosTheme) private var theme
-    @State private var blocks: [MarklyBlock] = []
+    @State private var blocks: [MarklyBlock]
 
     /// Creates a chrome-less markdown body view.
     /// - Parameters:
@@ -47,6 +47,15 @@ public struct MarklyMarkdown: View {
     public init(_ markdown: String, fontSize: MarklyFontSize = .default) {
         self.markdown = markdown
         self.fontSize = fontSize
+        // Parse EAGERLY so the body renders on the FIRST frame. A chrome-less body view must not
+        // depend on `.task` firing to show content — some host contexts (e.g. `ImageRenderer`, and
+        // edge cases in live scroll/nav) render before the async task runs, leaving a blank frame.
+        // `MarklyDocumentParser.parse` is synchronous, Foundation-only, and cheap for an inline
+        // post/comment body (unlike a full book, which is why `MarklyReader` keeps async parsing);
+        // a body fragment is small enough to parse on the main actor without hitching. The
+        // instrumented `.task` below still re-parses for logging/measurement and to handle the
+        // same view instance being reused with different markdown.
+        _blocks = State(initialValue: MarklyDocumentParser.parse(markdown))
     }
 
     public var body: some View {
@@ -80,15 +89,24 @@ public struct MarklyMarkdown: View {
                     .environment(\.marklyReaderFontSize, fontSize)
             }
         }
+        // Re-parse through the instrumented use case on appear and whenever `markdown` changes (the
+        // same view instance can be reused with different content inside a list). The eager init
+        // parse already rendered the first frame; this re-parse is for logging/measurement parity
+        // with `MarklyReader` and to refresh `blocks` if the source was swapped.
         .task(id: markdown) { await parse() }
     }
 
-    /// Parses `markdown` into `[MarklyBlock]` through the instrumented use case (detached off-main,
-    /// measured/reported). The body is total in practice; `try?` guards the throw contract.
+    /// Re-parses `markdown` through the instrumented use case (detached off-main, measured/reported)
+    /// for logging/measurement parity with `MarklyReader`, and to refresh `blocks` when the source
+    /// is swapped. The parse body is total in practice; on the off chance the instrumented call
+    /// returns `nil`, the eager init-parsed `blocks` are kept rather than wiped to `[]` — a
+    /// chrome-less body view must never blank itself once it has content.
     @MainActor
     private func parse() async {
-        let parsed = try? await MarklyParse.useCase.executeTyped(MarklyParseInput(source: markdown))
-        blocks = parsed?.blocks ?? []
+        guard let parsed = try? await MarklyParse.useCase.executeTyped(MarklyParseInput(source: markdown)) else {
+            return
+        }
+        blocks = parsed.blocks
     }
 }
 

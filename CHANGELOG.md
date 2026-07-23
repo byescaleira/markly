@@ -6,6 +6,29 @@ All notable changes to Markly are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-07-23
+
+Fixes `MarklyMarkdown` (added in 0.6.0) rendering blank in host contexts that render before the
+async `.task` parse resolves — notably the first frame inside a live `ScrollView`/`NavigationStack`,
+and any synchronous render path (e.g. `ImageRenderer`). The body now parses **eagerly** in `init`
+(synchronous, Foundation-only, cheap for an inline post/comment body — unlike a full book, which is
+why `MarklyReader` keeps async parsing), so content appears on the first frame with no dependence on
+`.task` firing. The instrumented `.task` re-parse is kept for logging/measurement parity and to
+refresh `blocks` when the source is swapped, but it no longer wipes the view to `[]` if the
+instrumented call ever returns `nil` — a chrome-less body view never blanks itself once it has
+content. 97 passing tests (adds a `MarklyMarkdown` render regression suite); builds clean on iOS,
+macOS, tvOS, and visionOS 26.
+
+### Fixed
+
+- **`MarklyMarkdown` rendered blank until the async parse resolved.** `blocks` was initialized to
+  `[]` and populated only inside `.task`, so any render before the task ran (the first frame in a
+  live host, or a synchronous `ImageRenderer` pass) showed nothing. `blocks` is now parsed eagerly
+  in `init` via `MarklyDocumentParser.parse`, so the first frame already has content.
+- **`MarklyMarkdown.parse()` no longer blanks the view on instrumented-call failure.** It previously
+  assigned `blocks = parsed?.blocks ?? []`, which would wipe the eager-parsed blocks to `[]` if the
+  instrumented use case ever returned `nil`. It now keeps the existing blocks in that case.
+
 ## [0.6.0] - 2026-07-23
 
 Adds a chrome-less public markdown view so a fragment of markdown — a forum post body, a
