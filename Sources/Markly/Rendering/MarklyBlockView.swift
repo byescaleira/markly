@@ -67,7 +67,24 @@ struct MarklyBlockView: View {
                     .fill(theme.colors.outline)
                     .frame(width: md.blockQuoteBarWidth)
                 MarklyBlockSequence(blocks: blocks, tight: true)
+                    .padding(.trailing, CosmosSpacingTokens.small)
             }
+            .padding(.vertical, CosmosSpacingTokens.small)
+            // Accent-tinted card (10% accent) with rounded corners. `clipShape` rounds the
+            // leading bar's corners to the card's radius so the bar integrates with the rounded
+            // background instead of its square corners poking out of it.
+            .background(
+                RoundedRectangle(cornerRadius: md.blockQuoteCornerRadius, style: .continuous)
+                    .fill(theme.colors.accent.opacity(0.1))
+            )
+            .clipShape(RoundedRectangle(cornerRadius: md.blockQuoteCornerRadius, style: .continuous))
+            // `.fixedSize(horizontal: false, vertical: true)` pins the bar to the quote content's
+            // natural height. The `Rectangle` has a width-only frame, so without this it is
+            // height-flexible and stretches to whatever height the parent container proposes,
+            // making the accent bar visibly taller than the quoted text. Horizontal stays flexible
+            // so the text still wraps to the available width. Mirrors the vendored GitHub
+            // blockquote style in `Theme+Markly.swift`.
+            .fixedSize(horizontal: false, vertical: true)
             .id(id)
 
         case .list(let ordered, let start, let items, let id):
