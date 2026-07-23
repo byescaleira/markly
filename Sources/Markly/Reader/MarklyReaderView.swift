@@ -22,6 +22,7 @@ struct MarklyReaderView: View {
     let readingMode: MarklyReadingMode
 
     @Environment(\.cosmosTheme) private var theme
+    @Environment(\.marklyMarkdownTheme) private var md
     /// The reader's font-size step. Applied to the SwiftUI `Text`-based blocks (headings, non-
     /// selectable paragraphs, list markers, code, tables) via `.dynamicTypeSize` so the aA font-size
     /// slider scales them — independent of the system Dynamic Type setting, mirroring Apple Books.
@@ -59,9 +60,10 @@ struct MarklyReaderView: View {
     }
 
     private var stack: some View {
-        LazyVStack(alignment: .leading, spacing: CosmosSpacingTokens.large) {
-            ForEach(blocks, id: \.id) { block in
+        LazyVStack(alignment: .leading, spacing: 0) {
+            ForEach(Array(blocks.enumerated()), id: \.element.id) { index, block in
                 MarklyBlockView(block: block)
+                    .padding(.top, index == 0 ? 0 : md.topGap(for: block, tight: false))
             }
         }
         .scrollTargetLayout()

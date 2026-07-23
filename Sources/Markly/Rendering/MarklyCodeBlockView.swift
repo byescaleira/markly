@@ -25,6 +25,7 @@ struct MarklyCodeBlockView: View {
     let code: String
 
     @Environment(\.cosmosTheme) private var theme
+    @Environment(\.marklyMarkdownTheme) private var md
 
     var body: some View {
         VStack(alignment: .leading, spacing: CosmosSpacingTokens.small) {
@@ -58,12 +59,12 @@ struct MarklyCodeBlockView: View {
                 }
             }
         }
-        .padding(CosmosSpacingTokens.medium)
+        .padding(md.codePadding)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(theme.colors.surface)
         // A content surface nested in the page → iOS 26 uses a moderate corner radius (smaller
         // than the large floating toolbar, larger than a chip).
-        .clipShape(RoundedRectangle(cornerRadius: 20))
+        .clipShape(RoundedRectangle(cornerRadius: md.codeCornerRadius, style: .continuous))
     }
 
     /// `UIPasteboard` is unavailable on tvOS, so the Copy button is hidden there (no

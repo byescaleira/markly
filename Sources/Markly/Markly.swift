@@ -12,5 +12,5 @@ import Foundation
 /// Namespace for the Markly markdown e-reader package.
 public enum Markly {
     /// Semantic version of the Markly package.
-    public static let version = "0.3.1"
+    public static let version = "0.4.0"
 }

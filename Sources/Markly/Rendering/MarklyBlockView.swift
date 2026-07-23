@@ -1,11 +1,12 @@
 //
 //  MarklyBlockView.swift
-//  Markly
 //
 //  The per-block SwiftUI renderer. Switches on `MarklyBlock` and produces a view per case,
-//  styling from `@Environment(\.cosmosTheme)` (Cosmos theme tokens) and applying accessibility
-//  traits. Inline markdown routes through `MarklyInlineText` (native `Text(AttributedString)`);
-//  block layout is Markly's responsibility (see docs/Architecture.md §3, §10).
+//  styling from `@Environment(\.cosmosTheme)` (Cosmos color tokens) and
+//  `@Environment(\.marklyMarkdownTheme)` (markdown typography + layout), and applying
+//  accessibility traits. Inline markdown routes through `MarklyInlineText` (native
+//  `Text(AttributedString)`); block spacing is owned by `MarklyBlockSequence` (see
+//  docs/Architecture.md §3, §10).
 //
 
 import SwiftUI
@@ -17,27 +18,28 @@ struct MarklyBlockView: View {
     let block: MarklyBlock
 
     @Environment(\.cosmosTheme) private var theme
+    @Environment(\.marklyMarkdownTheme) private var md
     @Environment(\.marklySectionObserver) private var sectionObserver
     @Environment(\.marklyReaderFeatures) private var features
     @Environment(\.marklyReaderFontSize) private var fontSize
     @Environment(\.marklyHighlightsProvider) private var highlightsProvider
     @Environment(\.marklySelectionObserver) private var selectionObserver
 
-    /// Layout metrics that gate text-bearing content, scaled with Dynamic Type (Apple
-    /// accessibility guidance) so accessibility text sizes don't clip the block-quote bar or
-    /// cramp paragraph line spacing.
-    @ScaledMetric private var blockQuoteBarWidth: CGFloat = 3
-    @ScaledMetric private var paragraphLineSpacing: CGFloat = 4
-
     var body: some View {
         switch block {
         case .heading(let level, let inlines, let id):
-            MarklyInlineText(inlines: inlines)
-                .font(theme.typography.font(for: Self.headingStyle(level)))
-                .foregroundStyle(theme.colors.primary)
-                .accessibilityHeading(Self.accessibilityHeadingLevel(level))
-                .id(id)
-                .onAppear { sectionObserver(id) }
+            let heading = md.heading(for: level)
+            VStack(alignment: .leading, spacing: CosmosSpacingTokens.small) {
+                MarklyInlineText(inlines: inlines, baseSize: heading.size, weight: heading.weight)
+                    .foregroundStyle(level >= 6 ? theme.colors.secondary : theme.colors.primary)
+                    .accessibilityHeading(Self.accessibilityHeadingLevel(level))
+                if heading.showsDivider {
+                    Divider()
+                        .background(theme.colors.outline)
+                }
+            }
+            .id(id)
+            .onAppear { sectionObserver(id) }
 
         case .paragraph(let inlines, let id):
             paragraphBody(inlines: inlines, id: id)
@@ -50,12 +52,8 @@ struct MarklyBlockView: View {
             HStack(alignment: .top, spacing: CosmosSpacingTokens.small) {
                 Rectangle()
                     .fill(theme.colors.outline)
-                    .frame(width: blockQuoteBarWidth)
-                VStack(alignment: .leading, spacing: CosmosSpacingTokens.small) {
-                    ForEach(blocks, id: \.id) { sub in
-                        MarklyBlockView(block: sub)
-                    }
-                }
+                    .frame(width: md.blockQuoteBarWidth)
+                MarklyBlockSequence(blocks: blocks, tight: true)
             }
             .id(id)
 
@@ -78,12 +76,8 @@ struct MarklyBlockView: View {
                 .id(id)
 
         case .blockDirective(_, _, let blocks, let id):
-            VStack(alignment: .leading, spacing: CosmosSpacingTokens.small) {
-                ForEach(blocks, id: \.id) { sub in
-                    MarklyBlockView(block: sub)
-                }
-            }
-            .id(id)
+            MarklyBlockSequence(blocks: blocks, tight: true)
+                .id(id)
         }
     }
 
@@ -95,7 +89,7 @@ struct MarklyBlockView: View {
     @ViewBuilder
     private func paragraphBody(inlines: [MarklyInline], id: MarklySectionID) -> some View {
         #if !os(tvOS)
-        if features.highlights && !Self.containsImage(inlines) {
+        if features.highlights && !MarklyInlineText.containsImage(inlines) {
             MarklySelectableText(
                 inlines: inlines,
                 basePointSize: CosmosTextStyle.body.pointSize,
@@ -118,40 +112,9 @@ struct MarklyBlockView: View {
     @ViewBuilder
     private func textParagraph(inlines: [MarklyInline], id: MarklySectionID) -> some View {
         MarklyInlineText(inlines: inlines)
-            .font(theme.typography.font(for: .body))
             .foregroundStyle(theme.colors.primary)
-            .lineSpacing(paragraphLineSpacing)
+            .lineSpacing(md.paragraphLineSpacing)
             .id(id)
-    }
-
-    /// `true` if the inlines contain an image anywhere (images can't live in a text view, so such
-    /// paragraphs use the `Text` path).
-    private static func containsImage(_ inlines: [MarklyInline]) -> Bool {
-        for inline in inlines {
-            switch inline {
-            case .image:
-                return true
-            case .strong(let inner), .emphasis(let inner), .strikethrough(let inner):
-                if containsImage(inner) { return true }
-            case .link(_, let inner):
-                if containsImage(inner) { return true }
-            default:
-                break
-            }
-        }
-        return false
-    }
-
-    /// Maps a heading level (1–6) to a Cosmos text style for visual hierarchy.
-    private static func headingStyle(_ level: Int) -> CosmosTextStyle {
-        switch level {
-        case 1: .largeTitle
-        case 2: .title
-        case 3: .title2
-        case 4: .title3
-        case 5: .headline
-        default: .subheadline
-        }
     }
 
     /// Maps a heading level to a SwiftUI accessibility heading level for VoiceOver.

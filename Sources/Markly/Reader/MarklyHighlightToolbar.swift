@@ -46,9 +46,14 @@ struct MarklyHighlightToolbar: View {
         }
         .padding(.horizontal, CosmosSpacingTokens.medium)
         .padding(.vertical, CosmosSpacingTokens.small)
-        // Large floating surface → iOS 26 uses a generous corner radius (matching first-party cards).
+        // Large floating surface → iOS 26 Liquid Glass. `.glassEffect` is unavailable on visionOS
+        // (see SwiftUICore availability), so visionOS falls back to the translucent surface card.
+        #if os(visionOS)
         .background(theme.colors.surface, in: RoundedRectangle(cornerRadius: 32, style: .continuous))
         .shadow(color: .black.opacity(0.25), radius: 8, y: 2)
+        #else
+        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 32, style: .continuous))
+        #endif
         .task(id: existing?.id) {
             // Seed the note editor with the existing highlight's note whenever the highlight changes.
             noteText = existing?.note ?? ""

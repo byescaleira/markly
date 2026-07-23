@@ -33,6 +33,10 @@ This paragraph has **bold**, *italic*, ~~strikethrough~~, `inline code`, and a [
 
 ![Markly banner](https://placehold.co/600x160/EEEEEE/333333?text=Markly)
 
+A linked image — `[![alt](url)](link)` — renders the picture, not just the alt text:
+
+[![Markly on GitHub](https://placehold.co/480x120/333333/FFFFFF?text=Markly)](https://github.com/byescaleira/markly)
+
 \(hardBreakDemo)
 
 A soft break
@@ -57,12 +61,16 @@ across two lines (renders as a space).
 ### Unordered
 
 - Apple
+  - Honeycrisp
+    - A third nesting level cycles the marker to a square
+  - Gala
 - Banana
   1. Nested ordered one
   2. Nested ordered two
 - Cherry
+- ![img](https://placehold.co/120x80/333333/FFFFFF?text=lead) An item leading with an image
 
-## Code
+## Code `blocks`
 
 A fenced block with a language info string:
 

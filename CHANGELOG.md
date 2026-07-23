@@ -6,6 +6,66 @@ All notable changes to Markly are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-07-22
+
+A top-to-bottom rendering overhaul that brings the reading surface to GitHub-markdown quality,
+adapted from the [MarkdownUI](https://github.com/gonzalezreal/swift-markdown-ui) GitHub-theme
+recipes into Markly's architecture (the `apple/swift-markdown` parser, Markly's block/inline AST,
+selectable-text highlights, and Cosmos tokens are all preserved). 85 passing tests; builds clean
+on iOS, macOS, tvOS, and visionOS 26.
+
+### Added
+
+- **`MarklyMarkdownTheme`** — a color-free markdown layout/typography theme (colors stay Cosmos-driven
+  so paper styles still adapt), layered over `@Environment(\.cosmosTheme)`. Holds per-level heading
+  sizes/weights, the gap-before spacing engine, list markers/indentation, and code/table geometry.
+  Injected via `@Environment(\.marklyMarkdownTheme)` with a `.github` default.
+- **`marklyFont(size:weight:)`** — a `@ScaledMetric`-based font modifier (mirrors MarkdownUI's
+  `ScaledFontSizeModifier`) so headings, list markers, code, and table text scale with the aA
+  font-size slider, not just the system Dynamic Type setting.
+- **`MarklyBlockSequence`** — the block-stacking primitive: a zero-spacing stack with a per-block
+  *gap-before* padding. A deliberate `LazyVStack`-compatible alternative to MarkdownUI's
+  preference-key `BlockSequence` (which doesn't compose with lazy loading for long books). Tight
+  mode drives compact spacing inside list items and block quotes.
+- **`MarklyRemoteImage`** — a `URLSession`-based remote image that decodes to `UIImage`/`NSImage`
+  (carrying an intrinsic size) and renders `resizable().scaledToFit()`. Replaces the
+  `CosmosAsyncImage` path, which collapsed images to zero height. Guarded by a monotonic generation
+  token so a stale (cancelled or superseded) fetch can't clobber the live image, and resets to the
+  loading state when a recycled view's source changes.
+
+### Changed
+
+- **Headings are now bold and proportionally sized.** Root cause was Cosmos `font(for:)` returning
+  weightless `.system(textStyle)`; headings now render at `.system(size:weight:.semibold)` per
+  level (h1 32pt → h6 14pt, all semibold), with h1/h2 carrying a bottom divider. Inline code inside a
+  heading or semibold table header now matches the surrounding size/weight (SwiftUI renders
+  `AttributedString` `.code` runs with a monospaced font that bypasses the `.font` modifier, so
+  code runs are given an explicit monospaced font matching the base size/weight).
+- **Lists now nest properly.** Unordered markers cycle by depth (disc → circle → square), ordered
+  markers use `.monospacedDigit()` with trailing alignment, each nesting depth indents, and a
+  `marklyListDepth` environment threads depth through nested lists. Item rows align the marker to
+  the first text baseline, or to the top when the item leads with an image.
+- **Tables render the GitHub look.** A `Grid` with the gutter-fill border technique (the Grid's own
+  background is the border color, cell spacing equals the border width, opaque row backgrounds mask
+  it except in the gutters), alternating row backgrounds, a semibold header, and per-column
+  alignment — robust inside a `LazyVStack` without anchor-preference measurement.
+- **Block quotes** render through `MarklyBlockSequence(tight: true)` for compact nested spacing.
+- **iOS 26 Liquid Glass** on the floating highlight toolbar via `.glassEffect(.regular, in:)` on
+  iOS/macOS/tvOS 26 (the symbol is `@available(visionOS, unavailable)`, so visionOS keeps the
+  translucent surface-card fallback). Verified against the SwiftUICore `.swiftinterface`.
+- **`MarklyInlineText`** now detects images recursively (through strong/emphasis/strikethrough/link
+  containers), so the common linked-image `[![alt](url)](link)` and `**![alt](url)**` patterns render
+  the picture instead of just the alt text, and owns its base font so callers no longer apply a
+  separate `.font`.
+
+### Fixed
+
+- Images no longer collapse to zero height (replaced the `AsyncImage` content-closure path with
+  `MarklyRemoteImage`, which decodes to a platform image with an intrinsic size).
+- A cancelled stale image fetch can no longer overwrite the correct image or clobber a successful
+  load with the failure placeholder (generation-token guard).
+- Images nested inside link/strong/emphasis/strikethrough inlines are no longer silently dropped.
+
 ## [0.3.1] - 2026-07-22
 
 Follow-up to v0.3.0: test-framework migration, iOS 26 corner-radius polish, and the four
@@ -99,7 +159,9 @@ Core reader (prior, unpublished milestone).
 - Passed an adversarial code review (5-dimension, refutation-verified; 22 findings, 20
   confirmed) — all confirmed defects fixed and locked in with regression tests.
 
-[Unreleased]: https://github.com/byescaleira/markly/compare/0.3.0...HEAD
+[Unreleased]: https://github.com/byescaleira/markly/compare/0.4.0...HEAD
+[0.4.0]: https://github.com/byescaleira/markly/releases/tag/0.4.0
+[0.3.1]: https://github.com/byescaleira/markly/releases/tag/0.3.1
 [0.3.0]: https://github.com/byescaleira/markly/releases/tag/0.3.0
 [0.2.0]: https://github.com/byescaleira/markly/releases/tag/0.2.0
 [0.1.0]: https://github.com/byescaleira/markly/releases/tag/0.1.0

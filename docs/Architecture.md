@@ -41,7 +41,7 @@ The dependency direction is strictly **Public → Reader → Rendering → Domai
 Apple provides **no** SwiftUI primitive that renders markdown *blocks* (headings, lists, tables, block quotes) as native views. Foundation `AttributedString(markdown:)` only handles **inline** markdown (bold, italic, links, code spans) — and only when configured `interpretedSyntax: .inlineOnlyPreservingWhitespace`. So Markly's division of labor is:
 
 - **Inline** → Foundation `AttributedString(markdown:)` rendered through native `Text`. This is the only Apple-sanctioned inline renderer and it guarantees correct bold/italic/strikethrough/link/code semantics per Apple's markdown docs. `MarklyInlineText` serializes `MarklyInline` back to a markdown string (via `MarklyInlineSerializer`, which escapes `\ * _ ` [ ] !`) and hands it to `AttributedString(markdown:options:baseURL:)`.
-- **Block** → SwiftUI views owned by Markly, styled from Cosmos theme tokens. Each block case in `MarklyBlockView` produces a view; headings carry `.accessibilityHeading(...)`, code blocks get a copy button + `.accessibilityTextContentType(.sourceCode)`, tables get a horizontally-scrollable grid with per-column alignment, block quotes get a leading bar, lists get markers with correct ordered start index, thematic breaks use `CosmosDivider`.
+- **Block** → SwiftUI views owned by Markly, styled from Cosmos color tokens + a color-free `MarklyMarkdownTheme` (markdown typography/layout). Each block case in `MarklyBlockView` produces a view; headings render bold + proportionally sized via `marklyFont` (a `@ScaledMetric` modifier) with h1/h2 carrying a bottom divider and `.accessibilityHeading(...)`, code blocks get a copy button + `.accessibilityTextContentType(.sourceCode)`, tables get a `Grid` with the gutter-fill border technique + alternating rows + semibold header, block quotes get a leading bar + `MarklyBlockSequence(tight: true)`, lists cycle markers by depth with per-level indent, thematic breaks use `CosmosDivider`. Block spacing is a gap-before engine (`MarklyBlockSequence`), a `LazyVStack`-compatible alternative to MarkdownUI's preference-key `BlockSequence`.
 
 `CosmosText` exposes no `AttributedString` initializer, so inline runs must go through native `Text` — this is the pivotal constraint that forced the inline-vs-block split.
 
@@ -99,7 +99,7 @@ Round-trip fidelity of inline serialization is exercised by the parser tests; `M
 
 ## 9. Known limitations / Phase 2
 
-v0.1 passed an adversarial code review (5-dimension, refutation-verified; 22 findings, 20 confirmed). All confirmed correctness/accessibility/pluggability defects were fixed and locked in with regression tests (12 passing). Notable fixes: duplicate-heading `SectionID` de-duplication (`h2-x` → `h2-x-2`), block-directive parsing enabled (`ParseOptions.parseBlockDirectives`), code-language is the CommonMark first info-string token, `~` escaped in inline serialization (literal tildes no longer become strikethrough), link/image destinations angle-wrapped when unsafe (`)`/`(`/whitespace), images render via `CosmosAsyncImage` (not alt text), book swaps reload via `.task(id: book.id)`, parsing runs off the main actor, load failure / empty book surface a localized state instead of a blank page, code blocks and tables scroll horizontally (`fixedSize`/`Grid`), table header cells carry `.isHeader`, list items combine for VoiceOver, layout metrics scale with Dynamic Type (`@ScaledMetric`), the host's `cosmosConfiguration` is no longer force-overridden, the Copy button is hidden on tvOS (no pasteboard), and reader chrome is localized via `Bundle.module`.
+v0.1 passed an adversarial code review (5-dimension, refutation-verified; 22 findings, 20 confirmed). All confirmed correctness/accessibility/pluggability defects were fixed and locked in with regression tests (12 passing). Notable fixes: duplicate-heading `SectionID` de-duplication (`h2-x` → `h2-x-2`), block-directive parsing enabled (`ParseOptions.parseBlockDirectives`), code-language is the CommonMark first info-string token, `~` escaped in inline serialization (literal tildes no longer become strikethrough), link/image destinations angle-wrapped when unsafe (`)`/`(`/whitespace), images render via a remote-image view (v0.4 `MarklyRemoteImage`, replacing the v0.1 `CosmosAsyncImage` path which collapsed to zero height), book swaps reload via `.task(id: book.id)`, parsing runs off the main actor, load failure / empty book surface a localized state instead of a blank page, code blocks and tables scroll horizontally (`fixedSize`/`Grid`), table header cells carry `.isHeader`, list items combine for VoiceOver, layout metrics scale with Dynamic Type (`@ScaledMetric`), the host's `cosmosConfiguration` is no longer force-overridden, the Copy button is hidden on tvOS (no pasteboard), and reader chrome is localized via `Bundle.module`.
 
 Remaining limitations:
 - **No runtime verification**: there is no host app and SwiftUI `#Preview` cannot run headlessly; correctness is verified by compile (macOS host) + parser unit tests only. tvOS/iOS/visionOS compile-correctness of platform gates is reasoned, not built (no cross-SDK `swift build` without a host app).
@@ -124,7 +124,7 @@ Formatting is built with `NSAttributedString(markdown:options:baseURL:)` (the UI
 
 **Range-coordinate basis.** The text view's string is the re-parsed markdown of the block's inlines (via `MarklyInlineSerializer.toMarkdown` + `AttributedString.MarkdownParsingOptions(.inlineOnlyPreservingWhitespace)`). Selection → create → re-render all use this **same** basis, so a stored highlight re-renders at the correct offset. (The Highlights-list excerpt uses `inlinePlainText(inlines)`; the two plain texts agree for all inline kinds except line-break/whitespace edge cases, where the excerpt is cosmetic-only.)
 
-`MarklyBlockView.paragraph` routes through `MarklySelectableText` when `features.highlights` is on and the paragraph holds no inline image (images can't live in a text view), gated `#if !os(tvOS)`. Four environment values (`marklyReaderFeatures`, `marklyReaderFontSize`, `marklyHighlightsProvider`, `marklySelectionObserver` — in `MarklyReaderEnvironment`) inject the controller's state into the leaf block view without coupling it to the controller.
+`MarklyBlockView.paragraphBody` routes through `MarklySelectableText` when `features.highlights` is on and the paragraph holds no inline image (detected recursively via `MarklyInlineText.containsImage` — images can't live in a text view), gated `#if !os(tvOS)`. Four environment values (`marklyReaderFeatures`, `marklyReaderFontSize`, `marklyHighlightsProvider`, `marklySelectionObserver` — in `MarklyReaderEnvironment`) inject the controller's state into the leaf block view without coupling it to the controller.
 
 ### 10.2 Chrome (top + bottom toolbars)
 
@@ -198,12 +198,15 @@ Sources/Markly/
   Domain/Chapters/
     MarklyChapter.swift                 chapter entity + chapters-by-sections builder
   Rendering/
+    Theme/MarklyMarkdownTheme.swift    markdown layout/typography theme (.github) + marklyFont (v0.4)
+    MarklyBlockSequence.swift          gap-before spacing engine + marklyListDepth env (v0.4)
+    MarklyRemoteImage.swift            URLSession-decoded remote image (intrinsic-size) (v0.4)
     MarklyBlockView.swift               per-block switch (routes paragraphs → selectable text)
-    MarklyInlineText.swift              inline → AttributedString → Text
+    MarklyInlineText.swift              inline → AttributedString → Text; owns font; recursive image split (v0.4)
     MarklySelectableText.swift          UITextView/NSTextView selectable-text highlight surface (v0.3)
-    MarklyCodeBlockView.swift            code block + copy button
-    MarklyListView.swift                ordered/unordered list markers
-    MarklyTableView.swift               aligned, scrollable table grid
+    MarklyCodeBlockView.swift            code block + copy button (themed radius/padding) (v0.4)
+    MarklyListView.swift                ordered/unordered list markers; depth-cycled + indented (v0.4)
+    MarklyTableView.swift               aligned grid; gutter-fill borders + alternating rows (v0.4)
   Reader/
     MarklyReaderView.swift              ScrollView + LazyVStack surface (continuous/paged)
     MarklyReaderEnvironment.swift       features/fontSize/highlights/selection env values (v0.3)
@@ -239,7 +242,9 @@ Sources/MarklyTests/
   Fixtures/sample.md                    all-blocks fixture
 ```
 
-**Total: 85 passing tests** (61 v0.1/v0.2 + 24 v0.3), all on Apple's Swift Testing (`import Testing`, `@Test`, `#expect`/`#require`, `@Suite struct`) — XCTest was removed in v0.3.1.
+**Total: 85 passing tests** (61 v0.1/v0.2 + 24 v0.3), all on Apple's Swift Testing (`import Testing`, `@Test`, `#expect`/`#require`, `@Suite struct`) — XCTest was removed in v0.3.1. The v0.4.0 rendering overhaul changed no domain behavior, so the suite is unchanged.
+
+**v0.4.0 rendering overhaul**: brought the reading surface to GitHub-markdown quality, adapted from MarkdownUI's GitHub-theme recipes. `MarklyMarkdownTheme` (color-free, layered over Cosmos colors) holds per-level heading sizes/weights, the gap-before spacing engine (`MarklyBlockSequence`, a `LazyVStack`-compatible alternative to MarkdownUI's preference-key `BlockSequence`), list markers/indentation, and code/table geometry; `marklyFont` scales text via `@ScaledMetric`. Headings render bold + proportionally sized (root cause was Cosmos `font(for:)` returning weightless `.system(textStyle)`). `MarklyRemoteImage` replaces `CosmosAsyncImage` (which collapsed images to zero height) by decoding to `UIImage`/`NSImage` for an intrinsic size, with a generation-token guard against stale-fetch races. `MarklyInlineText` detects images recursively (linked-image `[![alt](url)](link)` now renders the picture) and owns its base font, setting an explicit monospaced font on `.code` runs so code spans inside headings/headers match the surrounding size/weight. Lists cycle markers by depth (disc → circle → square) with per-level indent; tables use a `Grid` gutter-fill border technique + alternating rows + semibold header. iOS 26 Liquid Glass on the floating highlight toolbar via `.glassEffect(.regular, in:)` on iOS/macOS/tvOS (the symbol is `@available(visionOS, unavailable)`, so visionOS keeps the surface-card fallback). Passed an adversarial 4-dimension review (correctness/Swift 6, cross-platform/OS 26, rendering quality, accessibility/highlights regression) with per-finding verification — 6 findings raised, all confirmed and fixed.
 
 **v0.3.1 follow-up**: migrated the entire suite from XCTest to Swift Testing; applied iOS 26 Liquid Glass corner radii per Apple's concentricity guidance (the large floating highlight toolbar uses 32pt, code blocks 20pt, the small color swatch chip stays 4pt; circles/capsules are untouched); and added the four review-regression tests deferred from v0.3 (chapter navigation, settings-decode priority/fallback, controller theme resolution, inlineCode whitespace round-trip).
 
