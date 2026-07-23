@@ -70,7 +70,25 @@ struct MarklyReaderView: View {
         .padding(pagePadding)
         // Drive every SwiftUI `Text`-based block from the reader's font-size step (independent of
         // the system Dynamic Type setting, like Apple Books). The selectable text views are
-        // unaffected (they size via `fontSize.scale`, not this environment).
+        // unaffected (they size via `fontSize.scale`, not this environment). MarkdownUI's
+        // `ScaledFontSizeModifier` also reads `.dynamicTypeSize`, so the blocks routed through the
+        // vendored MarkdownUI renderer (headings, code, rules, HTML) scale with the same slider.
         .dynamicTypeSize(fontSize.dynamicTypeSize)
+        // Style the MarkdownUI-rendered blocks (headings, code, rules, HTML) with a GitHub layout
+        // driven by Cosmos color tokens, so they adapt to the reader's paper style. Code blocks
+        // are overridden with `MarklyCodeBlockCard` (Copy button + Cosmos card) wrapping
+        // MarkdownUI's code label. Inline images that reach MarkdownUI (rare: an image inside a
+        // heading) load through Markly's Apple-only `URLSession` provider. Code is rendered with
+        // the plain-text highlighter (no third-party syntax highlighter; Apple-only).
+        .markdownTheme(MarklyMarkdownUITheme.theme(colors: theme.colors))
+        .markdownBlockStyle(\.codeBlock) { configuration in
+            MarklyCodeBlockCard(
+                label: configuration.label,
+                language: configuration.language,
+                code: configuration.content
+            )
+        }
+        .markdownInlineImageProvider(.markly)
+        .markdownCodeSyntaxHighlighter(.plainText)
     }
 }

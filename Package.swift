@@ -49,12 +49,37 @@ let package = Package(
         .package(url: "https://github.com/apple/swift-markdown.git", from: "0.8.0"),
     ],
     targets: [
+        // Vendored rendering layer from gonzalezreal/swift-markdown-ui (MIT; Copyright (c) 2020
+        // Guillermo Gonzalez). Only the rendering engine is vendored — the block/inline views,
+        // the Theme/BlockStyle/TextStyle system, and the AttributedString inline renderer. The
+        // cmark-based `MarkdownParser` and the programmatic DSL are NOT vendored: Markly parses
+        // with Apple's `apple/swift-markdown` and converts its `MarklyBlock` AST into MarkdownUI's
+        // `BlockNode` (single parse → highlight ranges align with the rendered text). The
+        // `NetworkImage` package is NOT vendored: Markly wires MarkdownUI's `ImageProvider`
+        // protocol to the existing `MarklyRemoteImage`. See Sources/MarkdownUI/LICENSE for the
+        // preserved MIT notice and README "Acknowledgements" for the credit.
+        .target(
+            name: "MarkdownUI",
+            path: "Sources/MarkdownUI",
+            exclude: ["LICENSE"],
+            // The vendored rendering layer stays at the Swift 5 language mode: gonzalezreal/
+            // swift-markdown-ui was written for Swift 5.6, and its Theme/BlockStyle/TextStyle
+            // closures and SwiftUI View initializers (e.g. `BlockStyle { Divider() }`) are not
+            // Swift 6 strict-concurrency-annotated — porting every closure to @MainActor/@Sendable
+            // would be a deep, fragile change to upstream code we want to keep close to vendored.
+            // Markly's own code stays at .v6 strict (the package default); only this vendored
+            // third-party target is .v5, the standard practice for vendoring a Swift-5 library.
+            // Markly consumes MarkdownUI entirely on the MainActor (rendering happens in View
+            // bodies), so no non-Sendable value crosses an actor boundary.
+            swiftSettings: [.swiftLanguageMode(.v5)]
+        ),
         .target(
             name: "Markly",
             dependencies: [
                 .product(name: "Nebula", package: "nebula"),
                 .product(name: "Cosmos", package: "cosmos"),
                 .product(name: "Markdown", package: "swift-markdown"),
+                .target(name: "MarkdownUI"),
             ],
             resources: [
                 // Reader-facing UI strings (String Catalog). `.process` compiles
