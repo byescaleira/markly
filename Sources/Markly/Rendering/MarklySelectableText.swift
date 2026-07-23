@@ -80,6 +80,18 @@ enum MarklyHighlightStyler {
     }
 }
 
+/// A fingerprint of the inputs that produce a selectable text view's attributed string, used to
+/// skip the (selection-resetting, delegate-firing) text replacement on SwiftUI re-renders where the
+/// content is unchanged. All members are `Equatable` (`MarklyInline`, `MarklyHighlight`,
+/// `MarklyFontSize`, `Color`, `CGFloat`).
+fileprivate struct MarklySelectableInputs: Equatable {
+    let inlines: [MarklyInline]
+    let basePointSize: CGFloat
+    let textColor: Color
+    let fontSize: MarklyFontSize
+    let highlights: [MarklyHighlight]
+}
+
 #if canImport(UIKit) && !os(tvOS)
 
 // MARK: - UIKit (iOS / iPadOS / visionOS)
@@ -102,26 +114,49 @@ struct MarklySelectableUIText: UIViewRepresentable {
         textView.textContainerInset = .zero
         textView.textContainer.lineFragmentPadding = 0
         textView.adjustsFontForContentSizeCategory = false
-        context.coordinator.update(inlines: inlines, basePointSize: basePointSize, textColor: textColor, fontSize: fontSize, highlights: highlights, into: textView)
+        let inputs = MarklySelectableInputs(inlines: inlines, basePointSize: basePointSize, textColor: textColor, fontSize: fontSize, highlights: highlights)
+        context.coordinator.lastInputs = inputs
+        context.coordinator.assign(inlines: inlines, basePointSize: basePointSize, textColor: textColor, fontSize: fontSize, highlights: highlights, into: textView)
         return textView
     }
 
     func updateUIView(_ textView: UITextView, context: Context) {
         context.coordinator.onSelection = onSelection
-        context.coordinator.update(inlines: inlines, basePointSize: basePointSize, textColor: textColor, fontSize: fontSize, highlights: highlights, into: textView)
+        let inputs = MarklySelectableInputs(inlines: inlines, basePointSize: basePointSize, textColor: textColor, fontSize: fontSize, highlights: highlights)
+        // Skip the text replacement when the rendered content is unchanged — the common case on
+        // scroll-driven re-renders where SwiftUI re-evaluates this view with identical inputs.
+        // Replacing `attributedText` clears the selection and synchronously fires
+        // `textViewDidChangeSelection` during the view-update pass, which would report `nil` and
+        // dismiss the user's active selection. Only re-apply when something actually changed.
+        guard inputs != context.coordinator.lastInputs else { return }
+        context.coordinator.lastInputs = inputs
+        context.coordinator.isApplying = true
+        context.coordinator.assign(inlines: inlines, basePointSize: basePointSize, textColor: textColor, fontSize: fontSize, highlights: highlights, into: textView)
+        context.coordinator.isApplying = false
+        // The replacement reset the selection; sync `lastReported` so the next real selection reports.
+        context.coordinator.lastReported = nil
     }
 
     func makeCoordinator() -> Coordinator { Coordinator(onSelection: onSelection) }
 
     @MainActor final class Coordinator: NSObject, UITextViewDelegate {
         var onSelection: (Range<Int>?) -> Void
-        private var lastReported: Range<Int>??
+        fileprivate var lastReported: Range<Int>??
+        /// The inputs behind the currently-rendered attributed string, to detect no-op re-renders.
+        fileprivate var lastInputs: MarklySelectableInputs?
+        /// `true` while a programmatic `attributedText` replacement is in flight, so the delegate
+        /// ignores the synchronous selection reset it triggers.
+        fileprivate var isApplying = false
 
         init(onSelection: @escaping (Range<Int>?) -> Void) {
             self.onSelection = onSelection
         }
 
         func textViewDidChangeSelection(_ textView: UITextView) {
+            // Ignore the synchronous selection reset caused by a programmatic attributedText
+            // replacement during updateUIView (would otherwise report `nil` mid-view-update and
+            // mutate state during the SwiftUI update transaction).
+            guard !isApplying else { return }
             let range = textView.selectedRange
             let selection: Range<Int>? = range.length > 0
                 ? range.location..<(range.location + range.length)
@@ -132,7 +167,7 @@ struct MarklySelectableUIText: UIViewRepresentable {
             onSelection(selection)
         }
 
-        func update(
+        func assign(
             inlines: [MarklyInline], basePointSize: CGFloat, textColor: Color,
             fontSize: MarklyFontSize, highlights: [MarklyHighlight], into textView: UITextView
         ) {
@@ -209,26 +244,43 @@ struct MarklySelectableNSText: NSViewRepresentable {
     func makeNSView(context: Context) -> MarklySelectableTextHostView {
         let host = MarklySelectableTextHostView()
         host.textView.delegate = context.coordinator
+        let inputs = MarklySelectableInputs(inlines: inlines, basePointSize: basePointSize, textColor: textColor, fontSize: fontSize, highlights: highlights)
+        context.coordinator.lastInputs = inputs
         host.apply(inlines: inlines, basePointSize: basePointSize, textColor: textColor, fontSize: fontSize, highlights: highlights)
         return host
     }
 
     func updateNSView(_ host: MarklySelectableTextHostView, context: Context) {
         context.coordinator.onSelection = onSelection
+        let inputs = MarklySelectableInputs(inlines: inlines, basePointSize: basePointSize, textColor: textColor, fontSize: fontSize, highlights: highlights)
+        // Skip the text replacement when unchanged (see the UIKit mirror for rationale): a
+        // `setAttributedString` call resets the selection and synchronously fires the delegate
+        // during the view-update pass, dismissing the user's active selection.
+        guard inputs != context.coordinator.lastInputs else { return }
+        context.coordinator.lastInputs = inputs
+        context.coordinator.isApplying = true
         host.apply(inlines: inlines, basePointSize: basePointSize, textColor: textColor, fontSize: fontSize, highlights: highlights)
+        context.coordinator.isApplying = false
+        context.coordinator.lastReported = nil
     }
 
     func makeCoordinator() -> Coordinator { Coordinator(onSelection: onSelection) }
 
     @MainActor final class Coordinator: NSObject, NSTextViewDelegate {
         var onSelection: (Range<Int>?) -> Void
-        private var lastReported: Range<Int>??
+        fileprivate var lastReported: Range<Int>??
+        /// The inputs behind the currently-rendered attributed string, to detect no-op re-renders.
+        fileprivate var lastInputs: MarklySelectableInputs?
+        /// `true` while a programmatic `setAttributedString` is in flight, so the delegate ignores
+        /// the synchronous selection reset it triggers.
+        fileprivate var isApplying = false
 
         init(onSelection: @escaping (Range<Int>?) -> Void) {
             self.onSelection = onSelection
         }
 
         func textViewDidChangeSelection(_ notification: Notification) {
+            guard !isApplying else { return }
             guard let textView = notification.object as? NSTextView else { return }
             let range = textView.selectedRange()
             let selection: Range<Int>? = range.length > 0

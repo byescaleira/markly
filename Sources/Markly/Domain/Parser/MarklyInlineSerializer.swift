@@ -45,6 +45,15 @@ public enum MarklyInlineSerializer {
             if code.contains("`") {
                 return "`` " + code + " ``"
             }
+            // CommonMark strips exactly one leading + one trailing space from a code span whose
+            // content both begins and ends with a space (and is not all spaces — all-space content
+            // is not stripped). That would eat the model's preserved whitespace on the inline
+            // reparse, breaking the byte-for-byte round trip the selectable-text coordinate basis
+            // depends on. Pad an extra space on each side in exactly that case so the strip
+            // consumes the padding instead. (` ` hi ` ` → re-parse → ` hi `.)
+            if code.hasPrefix(" ") && code.hasSuffix(" ") && code.contains(where: { !$0.isWhitespace }) {
+                return "` " + code + " `"
+            }
             return "`" + code + "`"
         case .link(let destination, let inner):
             return "[" + toMarkdown(inner) + "](" + wrapDestination(destination) + ")"

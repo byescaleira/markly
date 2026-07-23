@@ -169,6 +169,12 @@ public struct MarklyReader: View {
         .onChange(of: colorScheme) { _, newValue in
             controller.resolveAndUpdateTheme(colorScheme: newValue)
         }
+        // Re-resolve when the paper style changes programmatically (the aA sheet, a host setting
+        // it, or a restored preference) — not only when the system appearance flips. Without this,
+        // a `setPaperStyle` outside the sheet's own binding would not re-resolve the live theme.
+        .onChange(of: controller.configuration.paperStyle) { _, _ in
+            controller.resolveAndUpdateTheme(colorScheme: colorScheme)
+        }
         // Brightness dimmer: a translucent black overlay whose opacity tracks the reader's
         // brightness setting (1.0 = full, lower = dimmer). Non-interactive and hidden from
         // VoiceOver so it never blocks the reading surface. tvOS manages brightness at the system
@@ -352,11 +358,20 @@ public struct MarklyReader: View {
 
     // MARK: - Highlight excerpts + share
 
-    /// The plain-text excerpt of a highlight (its range within its section's flattened text), for
-    /// the Highlights list. Returns an empty string if the section can't be located.
+    /// The plain-text excerpt of a highlight (its range within its section's selectable-text basis),
+    /// for the Highlights list. Returns an empty string if the section can't be located.
+    ///
+    /// The excerpt MUST use the same coordinate basis the selectable text view used when the
+    /// highlight was created: inlines re-serialized via `MarklyInlineSerializer` then parsed with
+    /// `.inlineOnlyPreservingWhitespace` (which preserves a hard line break's `  \n` verbatim). The
+    /// cleaner `inlinePlainText` collapses a line break to a single space, so a stored range taken
+    /// against the re-parsed string would land on the wrong characters after any hard break — e.g.
+    /// a selection of `"after"` in `before  \nafter` would excerpt as `"ter"`. `selectablePlainText`
+    /// matches the stored range exactly; `inlinePlainText` is still used for TOC/search/share, which
+    /// want clean prose and never apply a stored highlight range.
     private func highlightExcerpt(for highlight: MarklyHighlight) -> String {
         guard let block = findBlock(id: highlight.sectionID, in: blocks),
-              let plain = plainText(for: block) else { return "" }
+              let plain = selectablePlainText(for: block) else { return "" }
         let lower = min(max(0, highlight.range.lowerBound), plain.count)
         let upper = min(max(lower, highlight.range.upperBound), plain.count)
         let start = plain.index(plain.startIndex, offsetBy: lower)
@@ -397,15 +412,32 @@ public struct MarklyReader: View {
         return nil
     }
 
-    /// The flattened plain text of a text-bearing block (paragraph or heading), or `nil` for
-    /// non-text blocks (highlights only anchor to selectable paragraphs in practice).
-    private func plainText(for block: MarklyBlock) -> String? {
+    /// The inlines of a text-bearing block (paragraph or heading), or `nil` for non-text blocks.
+    private func textInlines(for block: MarklyBlock) -> [MarklyInline]? {
         switch block {
         case .paragraph(let inlines, _), .heading(_, let inlines, _):
-            return inlinePlainText(inlines)
+            return inlines
         default:
             return nil
         }
+    }
+
+    /// The selectable text view's exact text basis for a block: inlines re-serialized to markdown
+    /// and re-parsed with `.inlineOnlyPreservingWhitespace`, so the resulting string's character
+    /// offsets match a stored `MarklyHighlight.range`. Falls back to `inlinePlainText` only if the
+    /// re-parse fails.
+    private func selectablePlainText(for block: MarklyBlock) -> String? {
+        guard let inlines = textInlines(for: block) else { return nil }
+        let markdown = MarklyInlineSerializer.toMarkdown(inlines)
+        let options = AttributedString.MarkdownParsingOptions(
+            allowsExtendedAttributes: true,
+            interpretedSyntax: .inlineOnlyPreservingWhitespace,
+            failurePolicy: .returnPartiallyParsedIfPossible
+        )
+        if let parsed = try? AttributedString(markdown: markdown, options: options) {
+            return String(parsed.characters)
+        }
+        return inlinePlainText(inlines)
     }
 
     @MainActor

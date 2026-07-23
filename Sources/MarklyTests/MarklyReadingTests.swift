@@ -7,31 +7,32 @@
 //  UserDefaults I/O is required.
 //
 
-import XCTest
+import Testing
+import Foundation
 @testable import Markly
 import Nebula
 
 @MainActor
-final class MarklyReadingTests: XCTestCase {
+@Suite struct MarklyReadingTests {
 
     // MARK: - TOC derivation
 
-    func testTOCExtractsHeadingsInOrder() {
+    @Test func tocExtractsHeadingsInOrder() {
         let blocks = MarklyDocumentParser.parse("# One\n\ntext\n\n## Two\n\n> ## Nested in quote")
         let entries = MarklyTOC.entries(from: blocks)
-        XCTAssertEqual(entries.map(\.title), ["One", "Two", "Nested in quote"])
-        XCTAssertEqual(entries.map(\.level), [1, 2, 2])
+        #expect(entries.map(\.title) == ["One", "Two", "Nested in quote"])
+        #expect(entries.map(\.level) == [1, 2, 2])
     }
 
-    func testTOCEntriesMatchBlockSectionIDs() {
+    @Test func tocEntriesMatchBlockSectionIDs() {
         let blocks = MarklyDocumentParser.parse("# Heading One")
         let entries = MarklyTOC.entries(from: blocks)
-        XCTAssertEqual(entries.first?.id.raw, blocks.first?.id.raw)
+        #expect(entries.first?.id.raw == blocks.first?.id.raw)
     }
 
     // MARK: - Preferences-backed repository
 
-    func testPreferencesRepositorySavesAndFinds() async throws {
+    @Test func preferencesRepositorySavesAndFinds() async throws {
         let suite = UserDefaults(suiteName: "markly.tests.\(UUID().uuidString)")!
         let prefs = NebulaDefaults(suite)
         let repo = MarklyPreferencesRepository<MarklyBookmark>(prefs: prefs, key: "test.bookmarks")
@@ -39,14 +40,14 @@ final class MarklyReadingTests: XCTestCase {
         let bookmark = MarklyBookmark(bookID: UUID(), sectionID: MarklySectionID(raw: "h1-x"), title: "First")
         try await repo.save(bookmark)
         let found = try await repo.find(id: bookmark.id)
-        XCTAssertEqual(found?.title, "First")
+        #expect(found?.title == "First")
 
         try await repo.delete(bookmark.id)
         let after = try await repo.find(id: bookmark.id)
-        XCTAssertNil(after)
+        #expect(after == nil)
     }
 
-    func testPreferencesRepositoryUpsertsById() async throws {
+    @Test func preferencesRepositoryUpsertsById() async throws {
         let suite = UserDefaults(suiteName: "markly.tests.\(UUID().uuidString)")!
         let prefs = NebulaDefaults(suite)
         let repo = MarklyPreferencesRepository<MarklyReadingPosition>(prefs: prefs, key: "test.positions")
@@ -55,14 +56,14 @@ final class MarklyReadingTests: XCTestCase {
         try await repo.save(MarklyReadingPosition(id: id, sectionID: MarklySectionID(raw: "h1-a")))
         try await repo.save(MarklyReadingPosition(id: id, sectionID: MarklySectionID(raw: "h1-b")))
         let count = try await repo.count()
-        XCTAssertEqual(count, 1, "Saving the same id should upsert, not append")
+        #expect(count == 1, "Saving the same id should upsert, not append")
         let found = try await repo.find(id: id)
-        XCTAssertEqual(found?.sectionID.raw, "h1-b")
+        #expect(found?.sectionID.raw == "h1-b")
     }
 
     // MARK: - Controller bookmarks + position
 
-    func testControllerAddRemoveBookmark() async {
+    @Test func controllerAddRemoveBookmark() async {
         let book = MarklyLiteralBook(title: "T", markdown: "# A")
         let controller = MarklyReaderController(
             book: book,
@@ -71,19 +72,19 @@ final class MarklyReadingTests: XCTestCase {
         )
 
         let section = MarklySectionID(raw: "h1-a")
-        XCTAssertFalse(controller.isBookmarked(section))
+        #expect(!controller.isBookmarked(section))
         await controller.addBookmark(at: section, title: "A")
-        XCTAssertTrue(controller.isBookmarked(section))
-        XCTAssertEqual(controller.bookmarks.count, 1)
+        #expect(controller.isBookmarked(section))
+        #expect(controller.bookmarks.count == 1)
 
         if let id = controller.bookmarks.first(where: { $0.sectionID == section })?.id {
             await controller.removeBookmark(id)
         }
-        XCTAssertFalse(controller.isBookmarked(section))
-        XCTAssertTrue(controller.bookmarks.isEmpty)
+        #expect(!controller.isBookmarked(section))
+        #expect(controller.bookmarks.isEmpty)
     }
 
-    func testControllerPositionSaveAndRestore() async {
+    @Test func controllerPositionSaveAndRestore() async {
         let book = MarklyLiteralBook(title: "T", markdown: "# A\n\n# B")
         let posRepo = NebulaFakeRepository<MarklyReadingPosition>()
         let controller = MarklyReaderController(
@@ -94,39 +95,39 @@ final class MarklyReadingTests: XCTestCase {
 
         // No position saved yet → restore returns nil.
         let initial = await controller.restorePosition()
-        XCTAssertNil(initial)
+        #expect(initial == nil)
 
         // Setting the current section and saving persists it keyed by the book id.
         controller.currentSectionID = MarklySectionID(raw: "h1-b")
         await controller.saveCurrentPosition()
         let restored = await controller.restorePosition()
-        XCTAssertEqual(restored?.raw, "h1-b")
+        #expect(restored?.raw == "h1-b")
 
         // The saved position is keyed by book.id (one per book).
         let stored = try? await posRepo.find(id: book.id)
-        XCTAssertEqual(stored?.sectionID.raw, "h1-b")
+        #expect(stored?.sectionID.raw == "h1-b")
     }
 
     // MARK: - Reader settings (Track 2)
 
-    func testSettingsStoreRoundTripsAndPersistsAcrossInstances() {
+    @Test func settingsStoreRoundTripsAndPersistsAcrossInstances() {
         let suite = UserDefaults(suiteName: "markly.tests.\(UUID().uuidString)")!
         let prefs = NebulaDefaults(suite)
         let key = "test.reader.settings"
 
         let store1 = MarklyReaderSettingsStore(prefs: prefs, key: key)
-        XCTAssertNil(store1.load(), "Nothing stored yet")
+        #expect(store1.load() == nil, "Nothing stored yet")
 
         store1.save(MarklyReaderSettings(readingMode: .paged, paperStyle: .sepia))
 
         // A fresh store reading the same key sees the saved value.
         let store2 = MarklyReaderSettingsStore(prefs: prefs, key: key)
         let loaded = store2.load()
-        XCTAssertEqual(loaded?.paperStyle, .sepia)
-        XCTAssertEqual(loaded?.readingMode, .paged)
+        #expect(loaded?.paperStyle == .sepia)
+        #expect(loaded?.readingMode == .paged)
     }
 
-    func testControllerRestoresPersistedSettingsOverridingSeededConfiguration() {
+    @Test func controllerRestoresPersistedSettingsOverridingSeededConfiguration() {
         let suite = UserDefaults(suiteName: "markly.tests.\(UUID().uuidString)")!
         let prefs = NebulaDefaults(suite)
         let settingsStore = MarklyReaderSettingsStore(prefs: prefs, key: "test.reader.settings")
@@ -138,13 +139,13 @@ final class MarklyReadingTests: XCTestCase {
             settingsStore: settingsStore
         )
 
-        XCTAssertEqual(controller.configuration.paperStyle, .night, "Persisted paper style should override seeded config")
-        XCTAssertEqual(controller.configuration.readingMode, .paged, "Persisted mode should override seeded config")
-        XCTAssertEqual(controller.configuration.fontSize, .extraLarge, "Persisted font size should override seeded config")
-        XCTAssertEqual(controller.configuration.brightness, 0.5, "Persisted brightness should override seeded config")
+        #expect(controller.configuration.paperStyle == .night, "Persisted paper style should override seeded config")
+        #expect(controller.configuration.readingMode == .paged, "Persisted mode should override seeded config")
+        #expect(controller.configuration.fontSize == .extraLarge, "Persisted font size should override seeded config")
+        #expect(controller.configuration.brightness == 0.5, "Persisted brightness should override seeded config")
     }
 
-    func testControllerSetReadingModePersists() {
+    @Test func controllerSetReadingModePersists() {
         let suite = UserDefaults(suiteName: "markly.tests.\(UUID().uuidString)")!
         let prefs = NebulaDefaults(suite)
         let settingsStore = MarklyReaderSettingsStore(prefs: prefs, key: "test.reader.settings")
@@ -156,11 +157,11 @@ final class MarklyReadingTests: XCTestCase {
         controller.setReadingMode(.paged)
 
         let loaded = settingsStore.load()
-        XCTAssertEqual(loaded?.readingMode, .paged)
-        XCTAssertEqual(controller.configuration.readingMode, .paged)
+        #expect(loaded?.readingMode == .paged)
+        #expect(controller.configuration.readingMode == .paged)
     }
 
-    func testControllerBookmarksAreScopedToCurrentBook() async throws {
+    @Test func controllerBookmarksAreScopedToCurrentBook() async throws {
         let bookA = MarklyLiteralBook(title: "A", markdown: "# A")
         let bookB = MarklyLiteralBook(title: "B", markdown: "# B")
         let bmRepo = NebulaFakeRepository<MarklyBookmark>()
@@ -171,11 +172,11 @@ final class MarklyReadingTests: XCTestCase {
         // bookB's controller should not see bookA's bookmark.
         let controllerB = MarklyReaderController(book: bookB, bookmarkRepository: bmRepo)
         await controllerB.refreshBookmarks()
-        XCTAssertTrue(controllerB.bookmarks.isEmpty, "Bookmarks must be scoped to the current book")
+        #expect(controllerB.bookmarks.isEmpty, "Bookmarks must be scoped to the current book")
 
         // bookA's controller should see it.
         let controllerA = MarklyReaderController(book: bookA, bookmarkRepository: bmRepo)
         await controllerA.refreshBookmarks()
-        XCTAssertEqual(controllerA.bookmarks.count, 1)
+        #expect(controllerA.bookmarks.count == 1)
     }
 }

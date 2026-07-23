@@ -66,6 +66,9 @@ struct MarklyHighlightsView: View {
                             .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
+                        // Announce the color before the excerpt (and the note), so VoiceOver conveys
+                        // the same cue the swatch gives visually. The swatch itself is decorative.
+                        .accessibilityLabel(rowLabel(for: highlight))
                         .contextMenu {
                             Button(role: .destructive) {
                                 onDelete(highlight.id)
@@ -90,10 +93,22 @@ struct MarklyHighlightsView: View {
                 .font(.system(size: 14, weight: .semibold))
                 .foregroundStyle(theme.colors.primary)
                 .frame(width: 20, height: 20)
+                .accessibilityHidden(true)
         } else {
             RoundedRectangle(cornerRadius: 4, style: .continuous)
                 .fill(color.color)
                 .frame(width: 20, height: 20)
+                .accessibilityHidden(true)
         }
+    }
+
+    /// The spoken row label: the color name, then the excerpt, then any note. The localized parts
+    /// (the color name, "Note") interpolate as `Text` so they localize; the dynamic excerpt/note
+    /// interpolate as `String` so they're treated as verbatim (non-localized) runtime values.
+    private func rowLabel(for highlight: MarklyHighlight) -> Text {
+        if let note = highlight.note, !note.isEmpty {
+            return Text("\(Text(highlight.color.accessibilityName, bundle: .module)), \(excerpt(highlight)), \(Text("Note", bundle: .module)): \(note)")
+        }
+        return Text("\(Text(highlight.color.accessibilityName, bundle: .module)), \(excerpt(highlight))")
     }
 }

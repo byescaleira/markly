@@ -287,12 +287,23 @@ public final class MarklyReaderController {
 
     /// Creates a highlight for the given section + character range using the sticky last-used
     /// color (updating it), persists it, and refreshes. Returns the created highlight.
+    ///
+    /// Idempotent + race-safe: if a highlight already covers this exact `sectionID` + `range`, it is
+    /// returned instead of stacking a duplicate (a fast double-tap on the color button, or two
+    /// concurrent `addHighlight` tasks, must not produce two highlights over the same text). The
+    /// new entry is appended to `highlights` synchronously — before the first `await` — so a
+    /// concurrent caller observing `highlights` while the save/refresh is suspended sees it and
+    /// takes the existing-highlight path rather than creating a second.
     @discardableResult
     public func addHighlight(at sectionID: MarklySectionID, range: Range<Int>) async -> MarklyHighlight {
+        if let existing = highlights.first(where: { $0.sectionID == sectionID && $0.range == range }) {
+            return existing
+        }
         let color = lastHighlightColor
         let highlight = MarklyHighlight(
             bookID: book.id, sectionID: sectionID, range: range, color: color
         )
+        highlights.append(highlight)
         try? await highlightRepository.save(highlight)
         await refreshHighlights()
         return highlight

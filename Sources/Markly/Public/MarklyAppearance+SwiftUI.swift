@@ -99,4 +99,17 @@ extension MarklyHighlightColor {
     public var backgroundColor: Color {
         color.opacity(0.45)
     }
+
+    /// A localized accessibility name for this color (used by the highlight toolbar buttons and the
+    /// highlights-list rows so VoiceOver announces the color, not just the excerpt).
+    var accessibilityName: LocalizedStringKey {
+        switch self {
+        case .underline: "Underline"
+        case .yellow: "Yellow"
+        case .green: "Green"
+        case .blue: "Blue"
+        case .pink: "Pink"
+        case .purple: "Purple"
+        }
+    }
 }
