@@ -110,9 +110,14 @@ public struct DefaultInlineImageProvider: InlineImageProvider {
   public func image(with url: URL, label: String) async throws -> Image {
     let platform = try await DefaultImageLoader.load(from: url)
     #if canImport(UIKit)
-    return Image(uiImage: platform, scale: 1, label: Text(label))
+    // `Image(uiImage:scale:label:)` does not resolve on iOS/tvOS/visionOS (the compiler falls back
+    // to the `CGImage` positional init), so use the single-arg init. The alt-text label is not
+    // attachable to a bare `Image` returned from this protocol; Markly's selectable paragraph path
+    // (`MarklyRichInlineContent`) carries image alt text as an accessibility label instead.
+    _ = label
+    return Image(uiImage: platform)
     #elseif canImport(AppKit)
-    // AppKit's Image has no scale/label init; attach the label as accessibility instead.
+    _ = label
     return Image(nsImage: platform)
     #endif
   }
