@@ -6,6 +6,29 @@ All notable changes to Markly are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-07-23
+
+Adds a chrome-less public markdown view so a fragment of markdown — a forum post body, a
+comment, a description — renders with the same engine as `MarklyReader` but embeds inline in a
+host's own scroll/layout hierarchy, without nesting a second `NavigationStack`/toolbar. No
+changes to the reader; 95 passing tests; builds clean on iOS, macOS, tvOS, and visionOS 26.
+
+### Added
+
+- **`MarklyMarkdown`** — a public `View` that parses a markdown string through the same
+  instrumented `MarklyParse` use case and renders it through the same `MarklyBlockSequence`
+  (gap-before engine + MarkdownUI theme / `MarklyCodeBlockCard` / `.markly` image and
+  plain-text syntax providers) as `MarklyReader`, but with **no e-reader surface**: no
+  `NavigationStack`, toolbar, bottom bar, sheets, brightness, bookmarks, highlights, or
+  reading-position persistence. Reader features are forced to `.none`, so paragraphs take the
+  non-selectable `Text` path (no text-selection/highlight surface) — the right default for an
+  inline, read-only body. An optional `fontSize:` (`MarklyFontSize`, default `.default`) drives
+  the SwiftUI `Text`-based blocks at a discrete step independent of the system Dynamic Type
+  setting, mirroring the reader's aA slider. Re-parsing is keyed on the source (`.task(id:)`),
+  so changing the markdown re-parses instead of leaving the prior content on screen. Use this
+  when you want markdown *rendering* without the reader *chrome*; for the full reading
+  experience (TOC, bookmarks, highlights, aA, share, position), use `MarklyReader`.
+
 ## [0.5.1] - 2026-07-23
 
 Adapts the vendored `MarkdownUI` rendering layer to the OS 26 / Swift 6.4 (Xcode 27)
