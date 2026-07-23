@@ -17,7 +17,7 @@ Markly is a Swift Package that turns a markdown string into a long-form reading 
 - **An Apple-Books-style toolbar** — a top bar with the current chapter title + an overflow menu, and a bottom bar with contents, appearance (aA), highlights, and share.
 - **Themes & settings** — font size, brightness, paper style (auto / white / sepia / night / dark), and scroll-vs-pages reading mode, persisted and restored on launch.
 - **In-document search**, a **table of contents**, and **bookmarks**.
-- An **Apple-only stack**: parsed with [apple/swift-markdown](https://github.com/apple/swift-markdown) and inlined with Foundation `AttributedString(markdown:)`. No third-party markdown dependencies.
+- An **Apple-only stack**: parsed with [apple/swift-markdown](https://github.com/apple/swift-markdown), inlined with Foundation `AttributedString(markdown:)`, and rendered through a vendored slice of [gonzalezreal/swift-markdown-ui](https://github.com/gonzalezreal/swift-markdown-ui) (MIT — see [Acknowledgements](#acknowledgements)). No third-party markdown *parsing* dependency; MarkdownUI's parser is Apple's own cmark, the same engine behind `apple/swift-markdown`.
 
 It targets **iOS, macOS, tvOS, and visionOS 26** (deliberately no watchOS — a long-form reader's chrome does not fit a watch). Swift 6, strict concurrency.
 
@@ -33,7 +33,7 @@ Add Markly as a package dependency:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/byescaleira/markly.git", from: "0.4.0")
+    .package(url: "https://github.com/byescaleira/markly.git", from: "0.5.0")
 ]
 ```
 
@@ -132,3 +132,20 @@ See [`CONTRIBUTING.md`](./CONTRIBUTING.md) for the release process.
 ## License
 
 MIT — see [`LICENSE`](./LICENSE).
+
+## Acknowledgements
+
+Markly's markdown **rendering layer** — the block/inline views, the `Theme`/`BlockStyle`/`TextStyle`
+system, and the `BlockNode`/`InlineNode` AST used to render headings, code blocks, thematic breaks,
+and HTML blocks — is built using code from [gonzalezreal/swift-markdown-ui](https://github.com/gonzalezreal/swift-markdown-ui)
+("MarkdownUI"), MIT-licensed with **Copyright (c) 2020 Guillermo Gonzalez**. That code is vendored
+into [`Sources/MarkdownUI/`](./Sources/MarkdownUI/) and its verbatim MIT notice is preserved in
+[`Sources/MarkdownUI/LICENSE`](./Sources/MarkdownUI/LICENSE).
+
+Markly does not use MarkdownUI as a package dependency. Only the rendering engine is vendored;
+the cmark-based `MarkdownParser` and the programmatic DSL were not vendored. Markly parses with
+Apple's [`apple/swift-markdown`](https://github.com/apple/swift-markdown), converts its own
+`MarklyBlock` AST into MarkdownUI's `BlockNode`, and renders the leaf blocks through the vendored
+views. Paragraphs, block quotes, lists, tables, and block directives stay on Markly's own renderer
+so selectable-text highlights keep working at every nesting level. See
+[`docs/Architecture.md`](./docs/Architecture.md) §3 for the as-built split.

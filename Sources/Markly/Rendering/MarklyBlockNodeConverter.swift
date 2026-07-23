@@ -56,7 +56,13 @@ enum MarklyBlockNodeConverter {
     static func block(_ node: MarklyBlock) -> BlockNode {
         switch node {
         case .heading(let level, let inlines, _):
-            return .heading(level: level, content: inlines.map { inline($0) })
+            // MarkdownUI's `HeadingView` indexes `theme.headings[level - 1]` (a 6-element
+            // array), so a level outside 1...6 crashes with index-out-of-range. The parser only
+            // emits 1...6, but `MarklyBlock.heading` is a programmatic domain value; clamp to be
+            // total. This mirrors `MarklyBlockView.accessibilityHeadingLevel`, which already
+            // folds any out-of-range level onto `.h6`.
+            let clamped = min(max(level, 1), 6)
+            return .heading(level: clamped, content: inlines.map { inline($0) })
 
         case .paragraph(let inlines, _):
             return .paragraph(content: inlines.map { inline($0) })

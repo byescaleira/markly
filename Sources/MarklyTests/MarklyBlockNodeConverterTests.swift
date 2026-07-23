@@ -49,6 +49,24 @@ import MarkdownUI
 
     // MARK: Blocks
 
+    @Test func clampsOutOfRangeHeadingLevel() {
+        // MarkdownUI's `HeadingView` indexes a 6-element `theme.headings` array, so an out-of-range
+        // level would crash. The parser only emits 1...6, but `MarklyBlock.heading` is a
+        // programmatic value; the converter clamps to be total (mirroring the accessibility path).
+        #expect(
+            MarklyBlockNodeConverter.block(.heading(level: 0, inlines: [.text("T")], id: MarklySectionID(raw: "x")))
+            == .heading(level: 1, content: [.text("T")])
+        )
+        #expect(
+            MarklyBlockNodeConverter.block(.heading(level: 7, inlines: [.text("T")], id: MarklySectionID(raw: "x")))
+            == .heading(level: 6, content: [.text("T")])
+        )
+        #expect(
+            MarklyBlockNodeConverter.block(.heading(level: -3, inlines: [.text("T")], id: MarklySectionID(raw: "x")))
+            == .heading(level: 1, content: [.text("T")])
+        )
+    }
+
     @Test func convertsHeadingParagraphCodeHtml() {
         #expect(
             MarklyBlockNodeConverter.block(.heading(level: 2, inlines: [.text("T")], id: MarklySectionID(raw: "x")))

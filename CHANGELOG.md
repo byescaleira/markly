@@ -6,6 +6,68 @@ All notable changes to Markly are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-07-22
+
+Vendors the rendering engine of [gonzalezreal/swift-markdown-ui](https://github.com/gonzalezreal/swift-markdown-ui)
+(MIT, Copyright (c) 2020 Guillermo Gonzalez) into `Sources/MarkdownUI/` and routes Markly's leaf
+blocks — headings, code blocks, thematic breaks, and HTML blocks — through MarkdownUI's block
+views + `Theme` system, so the reading surface now uses that code directly (with an
+[Acknowledgements](./README.md#acknowledgements) credit and the verbatim MIT notice preserved in
+`Sources/MarkdownUI/LICENSE`). The `apple/swift-markdown` parser, Markly's block/inline AST,
+selectable-text highlights, and Cosmos tokens are all preserved. 95 passing tests; builds clean on
+iOS, macOS, tvOS, and visionOS 26.
+
+### Added
+
+- **Vendored `MarkdownUI` target** — the rendering layer of gonzalezreal/swift-markdown-ui (block
+  views, `Theme`/`BlockStyle`/`TextStyle` system, `BlockNode`/`InlineNode` AST, the `AttributedString`
+  and `Text` inline renderers, the `ImageProvider` / `InlineImageProvider` /
+  `CodeSyntaxHighlighter` extensibility protocols). The cmark-based `MarkdownParser` and the
+  programmatic DSL are NOT vendored. Kept at the Swift 5 language mode so its block-style closures
+  (which call `Divider()`/`VStack`/`ScrollView` — MainActor-isolated in the OS 26 SDK) compile
+  without Swift 6 strict-concurrency errors; Markly's own target stays at .v6 strict. Markly
+  consumes MarkdownUI entirely on the MainActor (rendering in view bodies), so no non-Sendable value
+  crosses an actor boundary.
+- **`MarklyBlockNodeConverter`** — a 1:1 bridge from `MarklyBlock` / `MarklyInline` to MarkdownUI's
+  `BlockNode` / `InlineNode`, so Markly's single-parse AST (highlight ranges stay aligned with the
+  rendered text) can drive MarkdownUI's views. Backed by 10 unit tests covering every case.
+- **`Theme.marklyGitHub(...)`** — a parameterized GitHub theme (in the Swift-5 target) whose colors
+  are supplied by the caller, so Markly can drive the MarkdownUI-rendered blocks from Cosmos color
+  tokens and they adapt to the reader's paper style (light / sepia / dark).
+- **`MarklyMarkdownUITheme`** — maps Cosmos color tokens onto the MarkdownUI `Theme`.
+- **`MarklyCodeBlockCard`** — Markly's code-block chrome (Copy button + Cosmos card) wrapping
+  MarkdownUI's syntax-highlighter label, so code blocks keep their e-reader feature while using
+  MarkdownUI's `CodeBlockView` + `CodeSyntaxHighlighter` plumbing (plain-text highlighter by
+  default; an Apple-only token lexer can be wired later via `.markdownCodeSyntaxHighlighter`).
+  Replaces the standalone `MarklyCodeBlockView`.
+- **`MarklyInlineImageProvider`** — a `URLSession`-backed, Apple-only `InlineImageProvider` for the
+  rare image that reaches MarkdownUI's inline renderer (e.g. an image inside a heading).
+
+### Changed
+
+- **Headings, code blocks, thematic breaks, and HTML blocks now render through MarkdownUI's
+  vendored block views**, styled by a Cosmos-colored GitHub theme. Headings keep their per-level
+  sizing (em-relative, scaled by the aA slider via `.dynamicTypeSize`), the h1/h2 divider, and the
+  section observer / VoiceOver heading level.
+- **`MarklyBlockView`** routes leaf blocks (heading, codeBlock, thematicBreak, htmlBlock) through
+  `BlockNode:View`; paragraphs, block quotes, lists, tables, and block directives stay on Markly's
+  own renderer so selectable-text highlights keep working at every nesting level. MarkdownUI's
+  `BlockSequence` margins are no-ops for a standalone `BlockNode`, so `MarklyBlockSequence`'s
+  gap-before engine still owns spacing (no double spacing).
+- **`MarklyReaderView`** injects `.markdownTheme`, `.markdownBlockStyle(\.codeBlock)` (the
+  `MarklyCodeBlockCard` override), `.markdownInlineImageProvider(.markly)`, and
+  `.markdownCodeSyntaxHighlighter(.plainText)`.
+
+### Fixed
+
+- A latent cross-platform bug in the vendored default inline image provider: `Image(uiImage:scale:label:)`
+  does not resolve on iOS/tvOS/visionOS (the compiler falls back to the `CGImage` positional init),
+  so the inline image providers now use the single-arg `Image(uiImage:)` / `Image(nsImage:)`.
+- `MarklyBlockNodeConverter` now clamps a heading level to 1...6 before handing it to MarkdownUI's
+  `HeadingView`, which indexes a 6-element `theme.headings` array. The parser only emits 1...6, but
+  `MarklyBlock.heading` is a programmatic value; the clamp makes the converter total (mirroring the
+  accessibility path) and avoids an index-out-of-range crash. Locked in with a regression test.
+
 ## [0.4.0] - 2026-07-22
 
 A top-to-bottom rendering overhaul that brings the reading surface to GitHub-markdown quality,
