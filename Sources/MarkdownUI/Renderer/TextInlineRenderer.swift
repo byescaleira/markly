@@ -102,20 +102,23 @@ private struct TextInlineRenderer {
 
   private mutating func renderImage(_ source: String) {
     if let image = self.images[source] {
-      self.result = self.result + Text(image)
+      // `Text + Text` is deprecated in OS 26; string interpolation is the recommended replacement
+      // and preserves the styling of the accumulated `result` and the appended `Text`.
+      self.result = Text("\(self.result)\(Text(image))")
     }
   }
 
   private mutating func defaultRender(_ inline: InlineNode) {
-    self.result =
-      self.result
-      + Text(
-        inline.renderAttributedString(
-          baseURL: self.baseURL,
-          textStyles: self.textStyles,
-          softBreakMode: self.softBreakMode,
-          attributes: self.attributes
-        )
+    // `Text + Text` is deprecated in OS 26; string interpolation is the recommended replacement
+    // and preserves the attributed runs of the accumulated `result` and the appended `Text`.
+    let next = Text(
+      inline.renderAttributedString(
+        baseURL: self.baseURL,
+        textStyles: self.textStyles,
+        softBreakMode: self.softBreakMode,
+        attributes: self.attributes
       )
+    )
+    self.result = Text("\(self.result)\(next)")
   }
 }

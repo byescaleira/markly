@@ -37,7 +37,12 @@ import SwiftUI
 /// ```
 ///
 /// ![](CustomBlockquote)
-public struct BlockStyle<Configuration> {
+// `@unchecked Sendable`: the stored view-builder closure is only ever invoked on the MainActor
+// (block styles are applied inside SwiftUI view bodies), so it is thread-safe in practice even
+// though the closure itself isn't `@Sendable`. This lets `Theme` (which is `Sendable`) hold block
+// styles without the Swift 6 "non-Sendable property of a Sendable struct" warning, and keeps the
+// vendored code compiling clean under the OS 26 / Swift 6.4 toolchain where upstream still warns.
+public struct BlockStyle<Configuration>: @unchecked Sendable {
   private let body: (Configuration) -> AnyView
 
   /// Creates a block style that customizes a block by applying the given body.

@@ -87,9 +87,10 @@ struct MarklyBlockView: View {
             MarklyTableView(header: header, rows: rows)
                 .id(id)
 
-        case .htmlBlock(let html, let id):
+        case .htmlBlock(_, let id):
             // Routed through MarkdownUI's `ParagraphView(content:)` — raw HTML renders as
-            // verbatim text (no inline-HTML rendering; Apple-only stack).
+            // verbatim text (no inline-HTML rendering; Apple-only stack). The html string isn't
+            // bound: `MarklyBlockNodeConverter.block(block)` consumes the whole enum value.
             MarklyBlockNodeConverter.block(block)
                 .id(id)
 

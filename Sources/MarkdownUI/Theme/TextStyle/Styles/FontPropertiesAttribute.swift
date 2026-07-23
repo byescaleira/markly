@@ -1,4 +1,9 @@
 import Foundation
+// `SwiftUIAttributes` (used as a stored property of `MarkdownUIAttributes` below) is re-exported by
+// `SwiftUI`; importing it surfaces it without the OS 26 "cannot use struct 'SwiftUIAttributes' ...
+// 'SwiftUICore' was not imported by this file" warning (`SwiftUICore` is an implementation detail
+// of `SwiftUI` on this toolchain, so it can't be imported directly).
+import SwiftUI
 
 enum FontPropertiesAttribute: AttributedStringKey {
   typealias Value = FontProperties

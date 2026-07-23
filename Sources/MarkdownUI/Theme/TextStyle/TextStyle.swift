@@ -57,6 +57,12 @@ import SwiftUI
 /// ```
 ///
 /// ![](CustomBlockquote)
-public protocol TextStyle {
+// `: Sendable`: every concrete text style in this package is a value type whose stored properties
+// are all Sendable (Color, Font, Font.Weight/Width, Text.LineStyle, CGFloat, Sendable enums,
+// AnyHashable), so each conformer gets a synthesized `Sendable` conformance for free. Marking the
+// protocol `Sendable` lets `Theme` (which is `Sendable`) hold `any TextStyle` properties without the
+// Swift 6 "non-Sendable property of a Sendable struct" warning, and keeps the vendored code
+// compiling clean under the OS 26 / Swift 6.4 toolchain where upstream still warns.
+public protocol TextStyle: Sendable {
   func _collectAttributes(in attributes: inout AttributeContainer)
 }

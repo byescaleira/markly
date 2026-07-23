@@ -1,9 +1,14 @@
 import SwiftUI
 
 /// The characteristics of a font.
-public struct FontProperties: Hashable {
+// `@unchecked Sendable`: every stored property is a value type, and the only one whose *static*
+// type isn't Sendable — `widthStorage: AnyHashable?` — only ever holds a `Font.Width` (Sendable) at
+// runtime (it erases `Font.Width` purely for the `@available` dance on `width`). So the struct is
+// safe to share across actors. `@unchecked` lets it conform to `Sendable` (required because
+// `FontProperties: TextStyle` and `TextStyle` is now `Sendable`) without the AnyHashable warning.
+public struct FontProperties: Hashable, @unchecked Sendable {
   /// The font family.
-  public enum Family: Hashable {
+  public enum Family: Hashable, Sendable {
     /// The system font family.
     case system(Font.Design = .default)
 
@@ -12,7 +17,7 @@ public struct FontProperties: Hashable {
   }
 
   /// The font family variant.
-  public enum FamilyVariant: Hashable {
+  public enum FamilyVariant: Hashable, Sendable {
     /// No variant. Use the current font family.
     case normal
 
@@ -21,7 +26,7 @@ public struct FontProperties: Hashable {
   }
 
   /// The font caps variant.
-  public enum CapsVariant: Hashable {
+  public enum CapsVariant: Hashable, Sendable {
     /// Don't use a font caps variant.
     case normal
 
@@ -36,7 +41,7 @@ public struct FontProperties: Hashable {
   }
 
   /// The font digit variant.
-  public enum DigitVariant: Hashable {
+  public enum DigitVariant: Hashable, Sendable {
     /// Don't use a font digit variant.
     case normal
 
@@ -45,7 +50,7 @@ public struct FontProperties: Hashable {
   }
 
   /// The font style.
-  public enum Style {
+  public enum Style: Sendable {
     /// Don't use a font style.
     case normal
 
