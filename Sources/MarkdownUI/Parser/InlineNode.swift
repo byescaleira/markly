@@ -1,6 +1,8 @@
 import Foundation
 
-enum InlineNode: Hashable, Sendable {
+// Vendored from gonzalezreal/swift-markdown-ui (MIT; Copyright (c) 2020 Guillermo Gonzalez).
+// Made `public` so Markly can construct `InlineNode` trees from its own `MarklyInline` AST.
+public enum InlineNode: Hashable, Sendable {
   case text(String)
   case softBreak
   case lineBreak
