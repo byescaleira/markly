@@ -221,7 +221,8 @@ Core reader (prior, unpublished milestone).
 - Passed an adversarial code review (5-dimension, refutation-verified; 22 findings, 20
   confirmed) — all confirmed defects fixed and locked in with regression tests.
 
-[Unreleased]: https://github.com/byescaleira/markly/compare/0.4.0...HEAD
+[Unreleased]: https://github.com/byescaleira/markly/compare/0.5.0...HEAD
+[0.5.0]: https://github.com/byescaleira/markly/releases/tag/0.5.0
 [0.4.0]: https://github.com/byescaleira/markly/releases/tag/0.4.0
 [0.3.1]: https://github.com/byescaleira/markly/releases/tag/0.3.1
 [0.3.0]: https://github.com/byescaleira/markly/releases/tag/0.3.0
