@@ -6,6 +6,75 @@ All notable changes to Markly are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.6.2] - 2026-07-23
+
+Refines the block-quote rendering: the leading accent bar no longer stretches
+beyond the quoted text, and the quote now sits in a subtle accent-tinted rounded
+card. No API or behavior changes; 97 passing tests.
+
+### Fixed
+
+- **Block-quote accent bar no longer taller than the quoted text.** The bar (a
+  width-only-framed `Rectangle` in the quote's `HStack`) was height-flexible and
+  stretched to whatever height the parent container proposed. The `HStack` is now
+  pinned with `.fixedSize(horizontal: false, vertical: true)` so the bar tracks the
+  quote content's natural height (horizontal stays flexible, so the text still
+  wraps). Mirrors the vendored GitHub blockquote style.
+
+### Changed
+
+- **Block quotes render in an accent-tinted rounded card.** A 10%-opacity accent
+  background with an 8pt corner radius (new `blockQuoteCornerRadius` theme token)
+  sits behind the quote; `clipShape` rounds the leading bar's corners to the card's
+  radius so it integrates with the rounded background. A small vertical/trailing
+  inset keeps the text off the rounded corners.
+
+## [0.6.1] - 2026-07-23
+
+Fixes `MarklyMarkdown` (added in 0.6.0) rendering blank in host contexts that render before the
+async `.task` parse resolves — notably the first frame inside a live `ScrollView`/`NavigationStack`,
+and any synchronous render path (e.g. `ImageRenderer`). The body now parses **eagerly** in `init`
+(synchronous, Foundation-only, cheap for an inline post/comment body — unlike a full book, which is
+why `MarklyReader` keeps async parsing), so content appears on the first frame with no dependence on
+`.task` firing. The instrumented `.task` re-parse is kept for logging/measurement parity and to
+refresh `blocks` when the source is swapped, but it no longer wipes the view to `[]` if the
+instrumented call ever returns `nil` — a chrome-less body view never blanks itself once it has
+content. 97 passing tests (adds a `MarklyMarkdown` render regression suite); builds clean on iOS,
+macOS, tvOS, and visionOS 26.
+
+### Fixed
+
+- **`MarklyMarkdown` rendered blank until the async parse resolved.** `blocks` was initialized to
+  `[]` and populated only inside `.task`, so any render before the task ran (the first frame in a
+  live host, or a synchronous `ImageRenderer` pass) showed nothing. `blocks` is now parsed eagerly
+  in `init` via `MarklyDocumentParser.parse`, so the first frame already has content.
+- **`MarklyMarkdown.parse()` no longer blanks the view on instrumented-call failure.** It previously
+  assigned `blocks = parsed?.blocks ?? []`, which would wipe the eager-parsed blocks to `[]` if the
+  instrumented use case ever returned `nil`. It now keeps the existing blocks in that case.
+
+## [0.6.0] - 2026-07-23
+
+Adds a chrome-less public markdown view so a fragment of markdown — a forum post body, a
+comment, a description — renders with the same engine as `MarklyReader` but embeds inline in a
+host's own scroll/layout hierarchy, without nesting a second `NavigationStack`/toolbar. No
+changes to the reader; 95 passing tests; builds clean on iOS, macOS, tvOS, and visionOS 26.
+
+### Added
+
+- **`MarklyMarkdown`** — a public `View` that parses a markdown string through the same
+  instrumented `MarklyParse` use case and renders it through the same `MarklyBlockSequence`
+  (gap-before engine + MarkdownUI theme / `MarklyCodeBlockCard` / `.markly` image and
+  plain-text syntax providers) as `MarklyReader`, but with **no e-reader surface**: no
+  `NavigationStack`, toolbar, bottom bar, sheets, brightness, bookmarks, highlights, or
+  reading-position persistence. Reader features are forced to `.none`, so paragraphs take the
+  non-selectable `Text` path (no text-selection/highlight surface) — the right default for an
+  inline, read-only body. An optional `fontSize:` (`MarklyFontSize`, default `.default`) drives
+  the SwiftUI `Text`-based blocks at a discrete step independent of the system Dynamic Type
+  setting, mirroring the reader's aA slider. Re-parsing is keyed on the source (`.task(id:)`),
+  so changing the markdown re-parses instead of leaving the prior content on screen. Use this
+  when you want markdown *rendering* without the reader *chrome*; for the full reading
+  experience (TOC, bookmarks, highlights, aA, share, position), use `MarklyReader`.
+
 ## [0.5.1] - 2026-07-23
 
 Adapts the vendored `MarkdownUI` rendering layer to the OS 26 / Swift 6.4 (Xcode 27)
@@ -250,7 +319,10 @@ Core reader (prior, unpublished milestone).
 - Passed an adversarial code review (5-dimension, refutation-verified; 22 findings, 20
   confirmed) — all confirmed defects fixed and locked in with regression tests.
 
-[Unreleased]: https://github.com/byescaleira/markly/compare/0.5.1...HEAD
+[Unreleased]: https://github.com/byescaleira/markly/compare/0.6.2...HEAD
+[0.6.2]: https://github.com/byescaleira/markly/releases/tag/0.6.2
+[0.6.1]: https://github.com/byescaleira/markly/releases/tag/0.6.1
+[0.6.0]: https://github.com/byescaleira/markly/releases/tag/0.6.0
 [0.5.1]: https://github.com/byescaleira/markly/releases/tag/0.5.1
 [0.5.0]: https://github.com/byescaleira/markly/releases/tag/0.5.0
 [0.4.0]: https://github.com/byescaleira/markly/releases/tag/0.4.0

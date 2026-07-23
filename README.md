@@ -77,6 +77,24 @@ struct ContentView: View {
 
 `MarklyReader(book:)` accepts anything conforming to the `MarklyBook` protocol — `MarklyLiteralBook` for an in-memory string, or your own type whose `source()` is `async` (fetch from disk, a bundle, or the network). Pass a `MarklyConfiguration` to toggle features, or a pre-built `MarklyReaderController` to own the reader's state externally.
 
+### Markdown without the reader
+
+When you want markdown *rendering* without the reader *chrome* — a post body inside an existing `NavigationStack`/`ScrollView`, where nesting a full `MarklyReader` would double the nav bar and nest scroll views — use ``MarklyMarkdown``. It runs the same parse + block engine as the reader but renders inline, with no `NavigationStack`, toolbar, bottom bar, sheets, brightness, bookmarks, highlights, or reading-position persistence:
+
+```swift
+import SwiftUI
+import Markly
+
+struct PostBody: View {
+    let body: String
+    var body: some View {
+        MarklyMarkdown(body)   // chrome-less; embeds in the host's own scroll/layout
+    }
+}
+```
+
+Paragraphs take the non-selectable `Text` path (reader features forced off), so there is no text-selection/highlight surface — appropriate for an inline, read-only body. Pass a `fontSize:` to drive the SwiftUI `Text`-based blocks at a discrete step independent of the system Dynamic Type setting, like the reader's aA slider.
+
 ## Features
 
 ### Chapters
