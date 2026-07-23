@@ -6,6 +6,35 @@ All notable changes to Markly are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-07-23
+
+Adapts the vendored `MarkdownUI` rendering layer to the OS 26 / Swift 6.4 (Xcode 27)
+toolchain so it builds with **zero warnings** on iOS, macOS, tvOS, and visionOS 26.
+Upstream `gonzalezreal/swift-markdown-ui` hasn't adapted for this toolchain yet, so the
+fixes are made directly in the vendored copy (which otherwise stays identical to upstream
+`main`). No API or behavior changes; 95 passing tests.
+
+### Changed
+
+- **`BlockStyle<Configuration>` is now `@unchecked Sendable`.** `Theme: Sendable` holds
+  block-style closures that are only ever invoked on the MainActor (inside SwiftUI view
+  bodies), so they're thread-safe in practice; `@unchecked` is the correct tool and clears
+  the "this is an error in the Swift 6 language mode" warnings.
+- **`protocol TextStyle` is now `Sendable`**, and `FontProperties` (plus its nested `Family`,
+  `FamilyVariant`, `CapsVariant`, `DigitVariant`, `Style` enums), `FontSize.Size`, and
+  `RelativeSize` (+ `RelativeSize.Unit`) gained `Sendable` conformance, so every concrete
+  text style synthesizes `Sendable` from its Sendable stored properties without per-property
+  warnings. `FontProperties` uses `@unchecked Sendable` because its `widthStorage:
+  AnyHashable?` only ever holds a Sendable `Font.Width` at runtime (an `@available`
+  erasure).
+- **`TextInlineRenderer` concatenates via string interpolation** (`Text("\(prev)\(next)")`)
+  instead of the deprecated `Text + Text` operator — the Apple-recommended OS 26
+  replacement, which preserves the attributed runs of both segments.
+- **`FontPropertiesAttribute` imports `SwiftUI`** instead of `SwiftUICore` (an
+  implementation detail of `SwiftUI` on this toolchain that can't be imported directly) to
+  surface `SwiftUIAttributes`.
+- **`MarklyBlockView.htmlBlock` drops its unused `html` binding**.
+
 ## [0.5.0] - 2026-07-22
 
 Vendors the rendering engine of [gonzalezreal/swift-markdown-ui](https://github.com/gonzalezreal/swift-markdown-ui)
@@ -221,7 +250,8 @@ Core reader (prior, unpublished milestone).
 - Passed an adversarial code review (5-dimension, refutation-verified; 22 findings, 20
   confirmed) — all confirmed defects fixed and locked in with regression tests.
 
-[Unreleased]: https://github.com/byescaleira/markly/compare/0.5.0...HEAD
+[Unreleased]: https://github.com/byescaleira/markly/compare/0.5.1...HEAD
+[0.5.1]: https://github.com/byescaleira/markly/releases/tag/0.5.1
 [0.5.0]: https://github.com/byescaleira/markly/releases/tag/0.5.0
 [0.4.0]: https://github.com/byescaleira/markly/releases/tag/0.4.0
 [0.3.1]: https://github.com/byescaleira/markly/releases/tag/0.3.1
