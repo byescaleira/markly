@@ -68,6 +68,13 @@ struct MarklyBlockView: View {
                     .frame(width: md.blockQuoteBarWidth)
                 MarklyBlockSequence(blocks: blocks, tight: true)
             }
+            // `.fixedSize(horizontal: false, vertical: true)` pins the bar to the quote content's
+            // natural height. The `Rectangle` has a width-only frame, so without this it is
+            // height-flexible and stretches to whatever height the parent container proposes,
+            // making the accent bar visibly taller than the quoted text. Horizontal stays flexible
+            // so the text still wraps to the available width. Mirrors the vendored GitHub
+            // blockquote style in `Theme+Markly.swift`.
+            .fixedSize(horizontal: false, vertical: true)
             .id(id)
 
         case .list(let ordered, let start, let items, let id):
