@@ -1,16 +1,28 @@
 //
 //  MarklyBlockView.swift
 //
-//  The per-block SwiftUI renderer. Switches on `MarklyBlock` and produces a view per case,
-//  styling from `@Environment(\.cosmosTheme)` (Cosmos color tokens) and
-//  `@Environment(\.marklyMarkdownTheme)` (markdown typography + layout), and applying
-//  accessibility traits. Inline markdown routes through `MarklyInlineText` (native
-//  `Text(AttributedString)`); block spacing is owned by `MarklyBlockSequence` (see
-//  docs/Architecture.md §3, §10).
+//  The per-block SwiftUI renderer. It splits Markly's `MarklyBlock` AST into two paths:
+//
+//  • Leaf blocks with no nested *selectable* paragraphs — heading, codeBlock, thematicBreak,
+//    htmlBlock — are converted to a MarkdownUI `BlockNode` (via `MarklyBlockNodeConverter`) and
+//    rendered through the vendored MarkdownUI block views + Theme system. This is where Markly
+//    uses gonzalezreal/swift-markdown-ui's rendering code (headings, code blocks, rules, HTML).
+//
+//  • Paragraphs, block quotes, lists, tables, and block directives stay on Markly's own renderer.
+//    Paragraphs are the highlight surface: their selectable text ranges are a byte-for-byte round
+//    trip through `MarklyInlineSerializer` + Foundation, and routing them through MarkdownUI's
+//    direct `InlineNode → AttributedString` renderer would misalign saved highlights. Block
+//    quotes, lists, and block directives stay on Markly's recursive container so paragraphs keep
+//    selectability at every nesting level. Tables stay on `MarklyTableView` (horizontal scroll
+//    for wide tables + Cosmos styling). See docs/Architecture.md §3, §10.
+//
+//  Block spacing is owned by `MarklyBlockSequence` (the gap-before engine); MarkdownUI's own
+//  `BlockSequence` margins are no-ops for a standalone `BlockNode`, so there is no double spacing.
 //
 
 import SwiftUI
 import Cosmos
+import MarkdownUI
 
 /// Renders a single markdown block.
 struct MarklyBlockView: View {
@@ -27,28 +39,29 @@ struct MarklyBlockView: View {
 
     var body: some View {
         switch block {
-        case .heading(let level, let inlines, let id):
-            let heading = md.heading(for: level)
-            VStack(alignment: .leading, spacing: CosmosSpacingTokens.small) {
-                MarklyInlineText(inlines: inlines, baseSize: heading.size, weight: heading.weight)
-                    .foregroundStyle(level >= 6 ? theme.colors.secondary : theme.colors.primary)
-                    .accessibilityHeading(Self.accessibilityHeadingLevel(level))
-                if heading.showsDivider {
-                    Divider()
-                        .background(theme.colors.outline)
-                }
-            }
-            .id(id)
-            .onAppear { sectionObserver(id) }
+        case .heading(let level, _, let id):
+            // Routed through MarkdownUI's `HeadingView` + the GitHub heading styles (Cosmos
+            // divider for h1/h2). The section observer registers the heading for TOC / scroll
+            // anchors; VoiceOver gets the heading level.
+            MarklyBlockNodeConverter.block(block)
+                .id(id)
+                .onAppear { sectionObserver(id) }
+                .accessibilityHeading(Self.accessibilityHeadingLevel(level))
 
         case .paragraph(let inlines, let id):
             paragraphBody(inlines: inlines, id: id)
 
-        case .codeBlock(let language, let code, let id):
-            MarklyCodeBlockView(language: language, code: code)
+        case .codeBlock(_, _, let id):
+            // Routed through MarkdownUI's `CodeBlockView`; the code-block style is overridden at
+            // the reader with `MarklyCodeBlockCard` (Copy button + Cosmos card), so Markly keeps
+            // its e-reader chrome while using MarkdownUI's code-block + syntax-highlighter plumbing.
+            MarklyBlockNodeConverter.block(block)
                 .id(id)
 
         case .blockQuote(let blocks, let id):
+            // Stays on Markly's recursive container so nested paragraphs keep their selectable
+            // highlights. MarkdownUI's `BlockquoteView` would render nested paragraphs as
+            // non-selectable `Text`, regressing the highlight feature inside quotes.
             HStack(alignment: .top, spacing: CosmosSpacingTokens.small) {
                 Rectangle()
                     .fill(theme.colors.outline)
@@ -58,24 +71,30 @@ struct MarklyBlockView: View {
             .id(id)
 
         case .list(let ordered, let start, let items, let id):
+            // Stays on Markly's recursive list view so nested list-item paragraphs keep selectable
+            // highlights and markers cycle by nesting depth.
             MarklyListView(ordered: ordered, start: start, items: items)
                 .id(id)
 
         case .thematicBreak(let id):
-            CosmosDivider()
+            // Routed through MarkdownUI's `ThematicBreakView` (Cosmos-colored rule).
+            MarklyBlockNodeConverter.block(block)
                 .id(id)
 
         case .table(let header, let rows, let id):
+            // Stays on `MarklyTableView`: horizontal scroll for wide tables + Cosmos styling,
+            // which MarkdownUI's `TableView` does not provide out of the box.
             MarklyTableView(header: header, rows: rows)
                 .id(id)
 
         case .htmlBlock(let html, let id):
-            // Apple-only: render raw HTML as verbatim preformatted text (no inline HTML rendering).
-            CosmosText(verbatim: html)
-                .cosmosTextStyle(.footnote)
+            // Routed through MarkdownUI's `ParagraphView(content:)` — raw HTML renders as
+            // verbatim text (no inline-HTML rendering; Apple-only stack).
+            MarklyBlockNodeConverter.block(block)
                 .id(id)
 
         case .blockDirective(_, _, let blocks, let id):
+            // Stays on Markly's recursive container (no MarkdownUI equivalent for block directives).
             MarklyBlockSequence(blocks: blocks, tight: true)
                 .id(id)
         }
