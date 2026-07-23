@@ -6,6 +6,29 @@ All notable changes to Markly are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.6.2] - 2026-07-23
+
+Refines the block-quote rendering: the leading accent bar no longer stretches
+beyond the quoted text, and the quote now sits in a subtle accent-tinted rounded
+card. No API or behavior changes; 97 passing tests.
+
+### Fixed
+
+- **Block-quote accent bar no longer taller than the quoted text.** The bar (a
+  width-only-framed `Rectangle` in the quote's `HStack`) was height-flexible and
+  stretched to whatever height the parent container proposed. The `HStack` is now
+  pinned with `.fixedSize(horizontal: false, vertical: true)` so the bar tracks the
+  quote content's natural height (horizontal stays flexible, so the text still
+  wraps). Mirrors the vendored GitHub blockquote style.
+
+### Changed
+
+- **Block quotes render in an accent-tinted rounded card.** A 10%-opacity accent
+  background with an 8pt corner radius (new `blockQuoteCornerRadius` theme token)
+  sits behind the quote; `clipShape` rounds the leading bar's corners to the card's
+  radius so it integrates with the rounded background. A small vertical/trailing
+  inset keeps the text off the rounded corners.
+
 ## [0.6.1] - 2026-07-23
 
 Fixes `MarklyMarkdown` (added in 0.6.0) rendering blank in host contexts that render before the
@@ -296,7 +319,10 @@ Core reader (prior, unpublished milestone).
 - Passed an adversarial code review (5-dimension, refutation-verified; 22 findings, 20
   confirmed) — all confirmed defects fixed and locked in with regression tests.
 
-[Unreleased]: https://github.com/byescaleira/markly/compare/0.5.1...HEAD
+[Unreleased]: https://github.com/byescaleira/markly/compare/0.6.2...HEAD
+[0.6.2]: https://github.com/byescaleira/markly/releases/tag/0.6.2
+[0.6.1]: https://github.com/byescaleira/markly/releases/tag/0.6.1
+[0.6.0]: https://github.com/byescaleira/markly/releases/tag/0.6.0
 [0.5.1]: https://github.com/byescaleira/markly/releases/tag/0.5.1
 [0.5.0]: https://github.com/byescaleira/markly/releases/tag/0.5.0
 [0.4.0]: https://github.com/byescaleira/markly/releases/tag/0.4.0
