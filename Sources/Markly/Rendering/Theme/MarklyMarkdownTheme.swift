@@ -69,6 +69,8 @@ struct MarklyMarkdownTheme: Sendable {
     let codePadding: CGFloat
     /// Width of the block-quote leading bar.
     let blockQuoteBarWidth: CGFloat
+    /// Corner radius of the block-quote card (accent-tinted background).
+    let blockQuoteCornerRadius: CGFloat
     /// Width of table grid lines (also the Grid cell spacing).
     let tableBorderWidth: CGFloat
     /// Horizontal padding inside a table cell (GitHub: 13).
@@ -107,6 +109,7 @@ struct MarklyMarkdownTheme: Sendable {
         codeCornerRadius: 16,
         codePadding: 16,
         blockQuoteBarWidth: 3,
+        blockQuoteCornerRadius: 8,
         tableBorderWidth: 1,
         tableCellPaddingH: 13,
         tableCellPaddingV: 6,
